@@ -1,0 +1,7 @@
+*.log
+*.pyc
+pycache
+.idea
+.vscode
+.setting
+*.bak

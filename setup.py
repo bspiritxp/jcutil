@@ -8,10 +8,11 @@ setuptools.setup(
     version='0.0.1b',
     author='Jochen.He',
     author_email='thjl@hotmail.com',
-    description='some util tools',
+    description='some python util tools in one package',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='',
+    python_requires='>=3.7',
     packages=setuptools.find_packages(),
     classifiers=[
         'Programming Language :: Python :: 3',

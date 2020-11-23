@@ -5,3 +5,5 @@ pycache
 .vscode
 .setting
 *.bak
+.pytest_cache
+__pycache__

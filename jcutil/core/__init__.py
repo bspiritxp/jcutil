@@ -5,17 +5,14 @@ import os
 from _contextvars import copy_context
 from functools import partial
 from importlib import import_module
-from jcramda import curry, compose, attr, has_attr, encode, decode
+
+from jcramda import curry, compose, has_attr, encode, decode
+
 from .jsonfy import *
+from .pdtools import *
 
-try:
-    from .pdtools import *
-    __PD_TOOLS__ = pdtools.__all__
-except ImportError:
-    __PD_TOOLS__ = ()
-
-
-__all__ = jsonfy.__all__ + __PD_TOOLS__ + (
+__all__ = jsonfy.__all__ + pdtools.__all__ + (
+    'host_mac',
     'hmac_sha256',
     'uri_encode',
     'uri_decode',
@@ -27,6 +24,11 @@ __all__ = jsonfy.__all__ + __PD_TOOLS__ + (
     'obj_dumps',
     'obj_loads',
 )
+
+
+def host_mac():
+    import uuid
+    return hex(uuid.getnode())[2:].upper()
 
 
 @curry

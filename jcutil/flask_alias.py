@@ -2,10 +2,9 @@ from enum import Flag, auto, Enum
 from functools import partial
 from typing import Union
 
-from jcramda.base.datetimes import locnow
 try:
     from quart import request, abort, jsonify, current_app
-except ImportError:
+except ModuleNotFoundError:
     from flask import request, abort, jsonify, current_app
 
 from .chalk import RedChalk

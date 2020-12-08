@@ -1,0 +1,5 @@
+jcramda
+aiohttp
+apscheduler
+pymongo
+pycryptodomex

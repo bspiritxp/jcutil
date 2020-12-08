@@ -4,8 +4,8 @@ from json import JSONEncoder, dumps, dump, JSONDecoder, loads, load
 from typing import Any, Iterable
 from uuid import UUID
 from collections import namedtuple
-from jcramda import (is_a, has_attr, is_a_int, when, camelcase, key_map, flat_concat, b64_encode, compose, identity, 
-    attr, partial, is_a_mapper)
+from jcramda import (is_a, has_attr, is_a_int, when, camelcase, key_map, flat_concat, b64_encode,
+                     compose, identity, attr, partial, is_a_mapper)
 from .pdtools import TYPE_REGS
 
 
@@ -98,7 +98,7 @@ def pp_json(obj):
         from pygments import highlight, lexers, formatters
         colorful_json = highlight(printed_str, lexers.JsonLexer(),
                                 formatters.TerminalFormatter())
-    except ImportError:
+    except ModuleNotFoundError:
         from jcutil.chalk import GreenChalk
         colorful_json = GreenChalk(printed_str)
     return colorful_json

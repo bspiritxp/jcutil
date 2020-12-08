@@ -1,6 +1,4 @@
-from enum import Enum, auto
-from functools import partial
-from typing import Callable, Optional
+from enum import Enum
 import consul
 
 
@@ -33,10 +31,10 @@ class ConfigFormat(Enum):
     Yaml = _yaml_load
 
 
-def fetch_key(key_path, format: ConfigFormat):
+def fetch_key(key_path, fmt: ConfigFormat):
     raw = consul.Consul().agent.kv.get(key_path).get('Value')
     assert raw, f'not found any content in {key_path}'
-    return format.value(raw)
+    return fmt.value(raw)
     
 
 def register_service(service_name, **kwargs):

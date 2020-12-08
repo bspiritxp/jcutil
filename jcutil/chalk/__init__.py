@@ -95,7 +95,7 @@ class Chalk(object):
         """
         Parameters
         -----------
-        *args : typing.List[FontFormat]
+        *args : FontFormat
         **kwargs
             * fg_color: 字体颜色
             * bg_color: 背景色
@@ -116,12 +116,15 @@ class Chalk(object):
             self.__chains__.append(end_all)
         return self
 
-    def write(self, text: str):
+    def text(self, text: str):
         self.__buffer__.append(text)
         return self
 
+    def format(self, text: str, *style: FontFormat):
+        self.use(*style).text(text).end(EndFlag.ALL_END)
+
     def bold(self, text: str):
-        self.use(FontFormat.BOLD).write(text)
+        self.use(FontFormat.BOLD).text(text)
 
     def expandtabs(self):
         return str(self).expandtabs()

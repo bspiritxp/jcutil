@@ -2,26 +2,25 @@ from decimal import Decimal
 from enum import Enum
 from typing import Union, Optional, List, Dict
 from uuid import uuid4
-
+from functools import partial
 import pymongo
 import pytz
 from bson import ObjectId, CodecOptions, Decimal128
 from bson.codec_options import TypeRegistry
 from bson.json_util import loads, dumps
 from gridfs import GridFS, GridFSBucket, GridOut
-from pandas.core.generic import NDFrame
 from pymongo import MongoClient
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.database import Database
 from pymongo.results import InsertOneResult, UpdateResult
-from jcramda import when, is_a, compose, attr, obj, has_attr
-from jcutil.extra import df_to_dict
+from jcramda import when, is_a, compose, attr, obj, has_attr, first, if_else, not_, popitem, \
+    getitem, in_, _, bind, enum_name, curry
 
 
 def fallback_encoder(value):
     return when(
         (is_a(Decimal), Decimal128),
-        (is_a(NDFrame), df_to_dict),
+        # (is_a(NDFrame), df_to_dict),
         (is_a(InsertOneResult), compose(obj('insertedId'), attr('inserted_id'))),
         (is_a(UpdateResult), compose(obj('upsertedId'), attr('upserted_id'))),
         (has_attr('get'), lambda o: o.get()),
@@ -52,7 +51,7 @@ class UniqFileGridFSBucket(GridFSBucket):
         return [*self.find({'filename': filename}).sort('uploadDate', -1).limit(1)]
 
     def _create_proxy(self, out: GridOut, opened=False):
-        fid: ObjectId = attr(out, '_id')
+        fid: ObjectId = getattr(out, '_id')
         self.delete(fid)
         create_method = self.open_upload_stream_with_id if opened \
             else self.upload_from_stream_with_id
@@ -64,7 +63,7 @@ class UniqFileGridFSBucket(GridFSBucket):
             first,
         )
         return compose(
-            if_else(is_empty,
+            if_else(not_,
                     lambda _: self.open_upload_stream(filename, **kwargs),
                     open_by_id),
             self._find_one,
@@ -77,7 +76,7 @@ class UniqFileGridFSBucket(GridFSBucket):
         )
 
         return compose(
-            if_else(is_empty,
+            if_else(not_,
                     lambda _: self.upload_from_stream(filename, **kwargs),
                     upload_by_id),
             self._find_one,
@@ -99,10 +98,10 @@ class BaseModel(object):
         return list(self.__collection.find(query, *args))
 
     def _save(self, sepc_field: str = None, **kwargs):
-        assert '_id' in kwargs or not is_empty(sepc_field) and sepc_field in kwargs, \
+        assert '_id' in kwargs or not not_(sepc_field) and sepc_field in kwargs, \
             f'must had [_id] field or [{sepc_field}] field'
         query = if_else(
-            has_key('_id'),
+            in_(_, '_id'),
             compose(obj('_id'), popitem('_id')),
             compose(obj(sepc_field), getitem(sepc_field))
         )
@@ -125,7 +124,7 @@ def new_client(uri: str, alias: str = None):
     return __clients[db_name]
 
 
-db_getter = compose(call, bind(MongoClient.get_default_database), flip(getitem)(__clients))
+db_getter = compose(bind('get_default_database'), getitem(_, __clients))
 
 
 def conn(key=None):
@@ -179,7 +178,7 @@ def find(collection, query):
 def find_page(collection, query, page_size=10, page_no=1, sort=None):
     assert is_a(Collection, collection)
     skip = page_size * (page_no - 1)
-    if is_empty(sort):
+    if sort is None:
         sort = [('createdTime', pymongo.DESCENDING)]
     query['logicDeleted'] = False
     c = collection.find(query).sort(sort).skip(skip).limit(page_size)
@@ -221,7 +220,7 @@ def save(collection, data):
 
     """
     r = if_else(
-        has_key('_id'),
+        in_(_, '_id'),
         lambda d: collection.update_one({'_id': data['_id']}, {'$set': d}, upsert=True),
         collection.insert_one
     )(data)

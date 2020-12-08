@@ -15,18 +15,16 @@ from pathlib import Path
 from typing import Union, Callable
 from uuid import uuid4
 
-from jcramda.core.operator import default_to
-
-from gridfs.errors import FileExists
-from joblib import memory, dump
 from jcramda import (
-    _, compose, join, replace, if_else, identity, hexdigest, pipe, 
+    _, compose, join, replace, identity, hexdigest, pipe,
 )
-from .extra import async_run
+from jcramda.core.operator import default_to
+from joblib import memory, dump
+
 from .defines import CACHE_DEFAULT_DIR, Writable, DEFAULT_CACHE_TIME
 from .drivers import redis
-from .jsonfy import to_json
-
+from .core import async_run
+from .core import to_json
 
 _loop = asyncio.get_event_loop()
 
@@ -142,7 +140,7 @@ def _save_data(fs: Writable, tmp_file: Path, data):
         dump(data, tmp_file)
         with tmp_file.open('rb') as ft:
             fs.write(ft)
-    except FileExists:
+    except FileExistsError:
         pass
     finally:
         tmp_file.unlink()
@@ -157,31 +155,13 @@ def persistence(fs: Union[Writable, Callable[[], Writable]], f):
     :return:
     :python_version: >= 3.8
     """
-    _rand_name = pipe(uuid4, str)
-
     @wraps(f)
     def wrapper(*args, **kwargs):
         r = f(*args, **kwargs)
         if r is not None:
-            save_opts = (identity(fs), Path(os.path.join(CACHE_DEFAULT_DIR, _rand_name())), r)
+            save_opts = (identity(fs), Path(os.path.join(CACHE_DEFAULT_DIR, uuid4().hex)), r)
             _loop.run_in_executor(None, copy_context().run, partial(_save_data, *save_opts))
         return r
 
     return wrapper
-
-
-def cache(fs_w, fs_r):
-    """
-    根据传入的fs_w和fs_r构造一个装饰器
-
-    Parameters
-    ----------
-    fs_w 用于【写】的file steam对象或工厂方法
-    fs_r 用于【读】的file steam对象或工厂方法
-
-    Returns
-    -------
-    (function) -> Any,
-    接受一个要缓存结果的构造器
-    """
 

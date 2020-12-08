@@ -13,6 +13,12 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='',
     python_requires='>=3.7',
+    depends=[
+        'joblib',
+        'pymongo',
+        'pycryptodomex',
+        'apscheduler'
+    ],
     packages=setuptools.find_packages(),
     classifiers=[
         'Programming Language :: Python :: 3',

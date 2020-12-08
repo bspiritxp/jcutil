@@ -1,3 +1,4 @@
+# depend on pycryptodomex module
 from Cryptodome.Cipher import AES
 import hashlib
 

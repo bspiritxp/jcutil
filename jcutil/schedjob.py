@@ -3,8 +3,8 @@ from enum import Enum
 from typing import Optional
 from apscheduler.schedulers.base import BaseScheduler, BaseJobStore
 from apscheduler.jobstores.mongodb import MongoDBJobStore
-from utils import host_mac
-from jcramda import from_import_as
+from jcramda import from_import_as, depop
+from .core import host_mac
 
 
 __all__ = (
@@ -13,7 +13,6 @@ __all__ = (
     'scheduler',
     'job2dict',
     'default_store_opts',
-    'MongoDBJobStore',
 )
 
 
@@ -123,7 +122,7 @@ class SchedulerManager(object):
         job = self.store.lookup_job(job_id)
         assert job, f'not found job by id {job_id}'
         if 'args' in change or 'kw' in change:
-            args, kw = depop([('args', ()), ('kw', {})], change)
+            args, kw = depop(['args', 'kw'], change)
             job = self.instance.modify_job(job_id, args=args, kwargs=kw)
         if 'trigger' in change:
             job = self.instance.reschedule_job(job_id, **change)

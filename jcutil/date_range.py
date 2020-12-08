@@ -1,10 +1,10 @@
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from typing import Union
-from utils.ramda import parse_dt, if_else, isinstance, identity, obj_with, getitem
+from jcramda import if_else, is_a, identity, obj, getitem, to_datetime
 
 DateType = Union[date, str, int]
-parse_to_datetime = if_else(isinstance(datetime), identity, parse_dt)
+parse_to_datetime = if_else(is_a(datetime), identity, to_datetime)
 DateRangeType = enumerate(['days', 'months', 'years', 'weeks'])
 
 
@@ -22,8 +22,8 @@ class DateRange(object):
         self.end_date = parse_to_datetime(end)
         assert self.end_date > self.start_date, 'end date must be grater then start date.'
         self.range_type = rtype
-        args = obj_with(step, self.range_type)
-        self.step = relativedelta(**args)
+        kws = {rtype: step}
+        self.step = relativedelta(**kws)
 
     def _iter_by_month(self):
         """

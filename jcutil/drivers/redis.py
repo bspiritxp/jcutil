@@ -1,3 +1,6 @@
+# Redis driver
+# please install python-redis
+#
 import time
 import asyncio
 from functools import wraps

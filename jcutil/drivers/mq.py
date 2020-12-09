@@ -1,3 +1,4 @@
+# need install kafka-python
 import json
 import os
 import asyncio
@@ -5,7 +6,6 @@ from enum import Enum, auto
 from typing import Union, Tuple, Callable, Any, Protocol, Optional
 from kafka import KafkaProducer, KafkaAdminClient, KafkaConsumer
 from kafka.admin import NewTopic
-from jcramda import loc
 from jcutil.core import async_run
 
 
@@ -36,9 +36,9 @@ class BaseMessage(Protocol):
 
 class MockMessage(BaseMessage):
     def __init__(self, **kwargs):
-        self.topic = loc('topic', kwargs)
-        self.key = loc('key', kwargs)
-        self.timestamp = loc('timestamp', kwargs)
+        self.topic = kwargs.get('topic')
+        self.key = kwargs.get('key')
+        self.timestamp = kwargs.get('timestamp')
         self.offset = kwargs.get('offset', 0)
         self.headers = kwargs.get('headers', [])
 
@@ -115,7 +115,7 @@ async def subscribe(tag, group_id, / ,
     Examples
     -------------------
         import asyncio
-        asyncio.run(subscribe('someTag', 'testGroup', 'testTopic', handler=print)
+        asyncio.run(subscribe('someTag', 'testGroup', 'testTopic', handler=print))
     """
     assert tag in __clients
     config = dict(

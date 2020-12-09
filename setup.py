@@ -17,7 +17,10 @@ setuptools.setup(
         'joblib',
         'pymongo',
         'pycryptodomex',
-        'apscheduler'
+        'apscheduler',
+        'pyyaml',
+        'consul',
+        'python-redis',
     ],
     packages=setuptools.find_packages(),
     classifiers=[

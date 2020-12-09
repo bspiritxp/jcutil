@@ -3,3 +3,4 @@ aiohttp
 apscheduler
 pymongo
 pycryptodomex
+pyyaml

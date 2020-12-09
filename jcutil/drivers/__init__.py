@@ -1,32 +1,14 @@
-
-__ACTIVATE_M = []
-
-try:
-    from . import db
-    __ACTIVATE_M.append('db')
-except ModuleNotFoundError:
-    pass
+import logging
+from importlib import import_module
 
 
-try:
-    from . import mongo
-    __ACTIVATE_M.append('mongo')
-except ModuleNotFoundError:
-    pass
+def smart_load(conf):
+    for key in conf:
+        try:
+            m = import_module(f'.{key}', package=__name__)
+            m.load(conf[key])
+        except ModuleNotFoundError as err:
+            logging.warning(err)
 
 
-try:
-    from . import redis
-    __ACTIVATE_M.append('redis')
-except ModuleNotFoundError:
-    pass
-
-
-try:
-    from .import mq
-    __ACTIVATE_M.append('mq')
-except ModuleNotFoundError:
-    pass
-
-
-__all__ = (*__ACTIVATE_M,)
+__all__ = ('smart_load',)

@@ -64,6 +64,17 @@ def connect(n: Union[str, int] = 0):
 
 
 def load(conf: dict):
+    """
+    一次性读取配置文件，生成数据库链接
+    配置文件格式：dict(dbname="{dburl}")
+    ```
+    {
+      "db1": "mysql://username:password@127.0.0.1:3306/dbname?encoding=utf8mb",
+      "myoracle": "oracle://...",
+    }
+    ```
+    @param conf: Dict[str, str]
+    """
     if conf and len(conf) > 0:
         for key in conf:
             init_engine(key, url=conf[key])

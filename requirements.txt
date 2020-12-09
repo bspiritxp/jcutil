@@ -4,3 +4,5 @@ apscheduler
 pymongo
 pycryptodomex
 pyyaml
+python-consul
+python-redis

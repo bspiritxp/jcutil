@@ -3,12 +3,14 @@ import consul
 
 
 __all__ = (
-    *consul.__all__,
+    'Consul',
     'path_join',
     'fetch_key',
     'register_service',
     'deregister',
 )
+
+Consul = consul.Consul
 
 
 def path_join(*args):
@@ -32,7 +34,7 @@ class ConfigFormat(Enum):
 
 
 def fetch_key(key_path, fmt: ConfigFormat):
-    raw = consul.Consul().agent.kv.get(key_path).get('Value')
+    raw = Consul().agent.kv.get(key_path).get('Value')
     assert raw, f'not found any content in {key_path}'
     return fmt.value(raw)
     
@@ -49,9 +51,9 @@ def register_service(service_name, **kwargs):
     -----------
     consul.base.Service
     """
-    c = consul.Consul()
+    c = Consul()
     c.agent.service.register(service_name, **kwargs)
 
 
 def deregister(service_id):
-    consul.Consul().agent.service.deregister(service_id)
+    Consul().agent.service.deregister(service_id)

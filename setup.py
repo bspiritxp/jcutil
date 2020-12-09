@@ -19,7 +19,7 @@ setuptools.setup(
         'pycryptodomex',
         'apscheduler',
         'pyyaml',
-        'consul',
+        'python-consul',
         'python-redis',
     ],
     packages=setuptools.find_packages(),

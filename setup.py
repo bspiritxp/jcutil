@@ -4,7 +4,7 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='JC python utils',
+    name='jcutil',
     version='0.0.1b',
     author='Jochen.He',
     author_email='thjl@hotmail.com',
@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='',
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     depends=[
         'joblib',
         'pymongo',

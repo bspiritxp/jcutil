@@ -34,7 +34,7 @@ class ConfigFormat(Enum):
 
 
 def fetch_key(key_path, fmt: ConfigFormat):
-    raw = Consul().agent.kv.get(key_path).get('Value')
+    raw = Consul().kv.get(key_path).get('Value')
     assert raw, f'not found any content in {key_path}'
     return fmt.value(raw)
     

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Callable
 import consul
 
 
@@ -26,17 +27,23 @@ def _json_load(raw_value):
     import json
     return json.loads(raw_value)
 
+def _hcl_load(raw_value):
+    import hcl
+    return hcl.loads(raw_value)
+
 
 class ConfigFormat(Enum):
-    Text = lambda r: str(r)
     Json = _json_load
     Yaml = _yaml_load
+    Hcl = _hcl_load
 
 
-def fetch_key(key_path, fmt: ConfigFormat):
-    raw = Consul().kv.get(key_path).get('Value')
+def fetch_key(key_path, fmt: Callable = None):
+    __, raw = Consul().kv.get(key_path)
     assert raw, f'not found any content in {key_path}'
-    return fmt.value(raw)
+    # noinspection PyCallingNonCallable
+    values = raw.get('Value')
+    return fmt(values) if callable(fmt) else values.decode()
     
 
 def register_service(service_name, **kwargs):

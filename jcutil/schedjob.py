@@ -16,6 +16,9 @@ __all__ = (
 )
 
 
+ERR_MSG = 'scheduler is not created'
+
+
 def job2dict(job):
     if not job:
         return {}
@@ -45,7 +48,7 @@ class SchedulerManager(object):
 
     async def start(self):
         cron = self.instance
-        assert cron, 'scheduler is not created'
+        assert cron, ERR_MSG
         assert not cron.running, 'scheduler is already running'
         await scheduler.lock.acquire()
         cron.start()
@@ -53,13 +56,13 @@ class SchedulerManager(object):
             await asyncio.sleep(1)
 
     def stop(self):
-        assert self.instance, 'scheduler is not created'
+        assert self.instance, ERR_MSG
         assert self.instance.running, 'scheduler is not running'
         self.instance.shutdown()
         scheduler.lock.release()
 
     def jobs(self):
-        assert self.instance, 'scheduler is not created'
+        assert self.instance, ERR_MSG
         if not self.instance.running:
             self.instance.start(True)
         r = list(map(job2dict, self.store.get_all_jobs()))
@@ -115,7 +118,6 @@ class SchedulerManager(object):
 
         """
         assert self.instance, 'scheduler is not created'
-        # assert self.instance.running, 'scheduler is not running'
         return self.instance.add_job(func, **job_opts)
 
     def modify(self, job_id, change):

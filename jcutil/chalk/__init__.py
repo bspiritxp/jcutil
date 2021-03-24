@@ -1,7 +1,7 @@
 import sys
 from enum import IntEnum
 from typing import Tuple
-from jcramda import compose, partial, join, if_else, ilen_gt, always, nth
+from jcramda import compose, partial, join, if_else, ilen_gt, always, nth, curry
 from jcutil.core import nl_print, c_write
 
 

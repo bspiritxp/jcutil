@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
-from typing import Union
+from typing import Union, Sequence
 from jcramda import if_else, is_a, identity, obj, getitem, to_datetime
 
 DateType = Union[date, str, int]
@@ -8,7 +8,7 @@ parse_to_datetime = if_else(is_a(datetime), identity, to_datetime)
 DateRangeType = enumerate(['days', 'months', 'years', 'weeks'])
 
 
-class DateRange(object):
+class DateRange(Sequence):
     start_date: datetime
     end_date: datetime
     range_type: DateRangeType

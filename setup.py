@@ -1,11 +1,11 @@
 import setuptools
 
-with open('README.md', 'r') as fh:
+with open('README.md', 'r', encoding='utf8') as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name='jcutil',
-    version='0.0.1b',
+    version='0.0.3',
     author='Jochen.He',
     author_email='thjl@hotmail.com',
     description='some python util tools in one package',

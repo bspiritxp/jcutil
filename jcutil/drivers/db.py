@@ -1,6 +1,7 @@
 from importlib import import_module
 from typing import Union
 from jcramda import loc
+import logging
 
 
 __all__ = [
@@ -30,15 +31,11 @@ def init_engine(tag: str, *args, create_engine=None, **kwargs):
     """
     schema = kwargs.get('schema', 'oracle')
     if create_engine is None:
-        try:
-            sqlmodule = import_module('sqlalchemy')
-            url = '{schema}://{user}:{password}@{dsn}?encoding=utf-8'\
-                .format(schema=schema, user=kwargs['user'], password=kwargs['password'],
-                        dsn=kwargs['dsn']) if 'url' not in kwargs else kwargs['url']
-            create_engine = sqlmodule.create_engine
-            current_engine = create_engine(url, pool_size=10, encoding='utf-8', **kwargs)
-        except ModuleNotFoundError:
-            raise RuntimeError('not found used database engine. ex: sqlalchemy')
+        sqlmodule = import_module('sqlalchemy')
+        url = '{schema}://{user}:{password}@{dsn}?encoding=utf-8'\
+            .format(schema=schema, user=kwargs['user'], password=kwargs['password'],
+                    dsn=kwargs['dsn']) if 'url' not in kwargs else kwargs.pop('url')
+        current_engine = sqlmodule.create_engine(url, pool_size=10, encoding='utf-8', **kwargs)
     else:
         current_engine = create_engine(*args, **kwargs)
     __engines[tag] = current_engine
@@ -49,9 +46,9 @@ def new_client(tag, *args, create_engine=None, **kwargs):
     if create_engine is None:
         try:
             module = import_module('sqlalchemy')
-            create_engine = module.create_engine
-        except ModuleNotFoundError:
-            raise RuntimeError('not found used database engine. ex: sqlalchemy')
+            create_engine = getattr(module, 'create_engine')
+        except ModuleNotFoundError as err:
+            logging.error(err)
 
     __engines[tag] = create_engine(*args, **kwargs)
     return __engines[tag]
@@ -77,7 +74,10 @@ def load(conf: dict):
     """
     if conf and len(conf) > 0:
         for key in conf:
-            init_engine(key, url=conf[key])
+            try:
+                init_engine(key, url=conf[key])
+            except Exception as err:
+                logging.warning(f'load database [{key}] failed: {err}')
             # print(f'database [{key}] connected')
 
 
@@ -86,3 +86,4 @@ conn = connect
 
 def instances():
     return [*__engines.keys()]
+

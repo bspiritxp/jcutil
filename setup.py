@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf8') as fh:
 
 setuptools.setup(
     name='jcutil',
-    version='0.0.3',
+    version='0.0.4',
     author='Jochen.He',
     author_email='thjl@hotmail.com',
     description='some python util tools in one package',

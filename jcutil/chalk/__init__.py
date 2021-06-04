@@ -22,7 +22,7 @@ __all__ = (
     'select'
 )
 
-__CHALK_TMPL__ = '$([char]27)[{}m' if os.name.startswith('nt') else '\033[{}m'
+__CHALK_TMPL__ = '\033[{}m'
 
 
 class Color(IntEnum):

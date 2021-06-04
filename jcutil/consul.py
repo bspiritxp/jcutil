@@ -1,6 +1,11 @@
 from enum import Enum
 from typing import Callable
 import consul
+try:
+    import hcl
+    HasHcl = True
+except ModuleNotFoundError:
+    HasHcl = False
 
 
 __all__ = (
@@ -27,15 +32,16 @@ def _json_load(raw_value):
     import json
     return json.loads(raw_value)
 
-def _hcl_load(raw_value):
-    import hcl
-    return hcl.loads(raw_value)
+if HasHcl:
+    def _hcl_load(raw_value):
+        import hcl
+        return hcl.loads(raw_value)
 
 
 class ConfigFormat(Enum):
     Json = _json_load
     Yaml = _yaml_load
-    Hcl = _hcl_load
+    Hcl = _hcl_load if HasHcl else lambda _: None
 
 
 def fetch_key(key_path, fmt: Callable = None):

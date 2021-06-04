@@ -1,4 +1,4 @@
-import sys
+import os
 from enum import IntEnum
 from typing import Tuple
 from jcramda import compose, partial, join, if_else, ilen_gt, always, nth, curry
@@ -22,7 +22,7 @@ __all__ = (
     'select'
 )
 
-__CHALK_TMPL__ = '\033[{}m'
+__CHALK_TMPL__ = '$([char]27)[{}m' if os.name.startswith('nt') else '\033[{}m'
 
 
 class Color(IntEnum):

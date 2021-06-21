@@ -1,4 +1,4 @@
-from . import *
+from jcutil.chalk import *
 
 
 def test_chalk_init():

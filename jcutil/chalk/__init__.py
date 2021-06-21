@@ -1,4 +1,5 @@
 import os
+from colorama import init
 from enum import IntEnum
 from typing import Tuple
 from jcramda import compose, partial, join, if_else, ilen_gt, always, nth, curry
@@ -21,6 +22,7 @@ __all__ = (
     'show_menu',
     'select'
 )
+
 
 __CHALK_TMPL__ = '\033[{}m'
 
@@ -90,6 +92,8 @@ class Chalk(object):
                  styles: Tuple[FontFormat] = ()):
         self.__buffer__ = [str(text)] if text else []
         self.__chains__ = [partial(__gen_raw__, fgc, bgc, *styles)]
+        if os.name == 'nt':
+            init()
 
     def use(self, *args, **kwargs):
         """

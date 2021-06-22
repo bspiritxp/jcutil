@@ -5,6 +5,7 @@
 import asyncio
 import base64
 import logging
+import warnings
 import os
 import pickle
 import shutil
@@ -22,7 +23,6 @@ from jcramda.core.operator import default_to
 from joblib import memory, dump
 
 from .defines import CACHE_DEFAULT_DIR, Writable, DEFAULT_CACHE_TIME
-from .drivers import redis
 from .core import async_run
 from .core import to_json
 
@@ -71,68 +71,76 @@ def clear_mem(path: str = '', cache_dir: str = CACHE_DEFAULT_DIR):
     # warnings.warn(f'delete {location}')
 
 
-def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
-    """
-    cache function result in redis.
-    result cache will be override by same process call
+try:
+    from .drivers import redis
+    def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
+        """
+        cache function result in redis.
+        result cache will be override by same process call
 
-    Notes
-    ----------
-    this function is not thead safe
-    ** function result must is a type can be json.dumps and json.loads **
+        Notes
+        ----------
+        this function is not thead safe
+        ** function result must is a type can be json.dumps and json.loads **
 
-    Parameters
-    ----------
-    prefix: cache key prefix, default is "fc"
-    expires: Union[int, timedelta],
-        seconds
-    redis_connector: function,
-        void -> redis.Client | redis.Pool
-    result_assert: typing.Callable[[], bool]
-        if this function is given, then use it check cache result, if return false then update cache
+        Parameters
+        ----------
+        prefix: cache key prefix, default is "fc"
+        expires: Union[int, timedelta],
+            seconds
+        redis_connector: function,
+            void -> redis.Client | redis.Pool
+        result_assert: typing.Callable[[], bool]
+            if this function is given, then use it check cache result, if return false then update cache
 
-    """
+        """
 
-    def decorator(f):
-        f_name = f.__module__ + '.' + f.__name__
-        c_key = join(':', [prefix, 'fc', f_name, '#pid'])
-        key_gen = compose(
-            replace('#pid', _, c_key),
-            default_to(os.getpid()),
-            hexdigest('md5'),
-            to_json
-        )
+        def decorator(f):
+            f_name = f.__module__ + '.' + f.__name__
+            c_key = join(':', [prefix, 'fc', f_name, '#pid'])
+            key_gen = compose(
+                replace('#pid', _, c_key),
+                default_to(os.getpid()),
+                hexdigest('md5'),
+                to_json
+            )
 
-        @wraps(f)
-        def redis_cache_f(*args, update_cache: bool = False, **kwargs):
-            client = redis_connector() if redis_connector else redis.connect()
-            cache_key = key_gen({'args': args, 'kwargs': kwargs})
+            @wraps(f)
+            def redis_cache_f(*args, update_cache: bool = False, **kwargs):
+                client = redis_connector() if redis_connector else redis.connect()
+                cache_key = key_gen({'args': args, 'kwargs': kwargs})
 
-            if not update_cache and client.exists(cache_key):
-                try:
-                    r = _obj_decode(client.get(cache_key))
-                    if not callable(result_assert) or result_assert(r):
-                        return r
-                except (TypeError, ValueError, pickle.UnpicklingError) as err:
-                    logging.error(err)
+                if not update_cache and client.exists(cache_key):
+                    try:
+                        r = _obj_decode(client.get(cache_key))
+                        if not callable(result_assert) or result_assert(r):
+                            return r
+                    except (TypeError, ValueError, pickle.UnpicklingError) as err:
+                        logging.error(err)
 
-            r = f(*args, **kwargs)
-            while asyncio.iscoroutine(r):
-                r = asyncio.run(r)
-            if r is not None:
-                client.set(cache_key, _obj_encode(r))
-                client.expire(cache_key, int(expires.total_seconds()) if isinstance(timedelta, expires) else expires)
-            return r
+                r = f(*args, **kwargs)
+                while asyncio.iscoroutine(r):
+                    r = asyncio.run(r)
+                if r is not None:
+                    client.set(cache_key, _obj_encode(r))
+                    client.expire(cache_key, int(expires.total_seconds()) if isinstance(timedelta, expires) else expires)
+                return r
 
-        if asyncio.iscoroutinefunction(f):
-            async def async_cache_f(*args, update_cache: bool = False, **kwargs):
-                return await async_run(redis_cache_f, with_context=True, *args,
-                                       update_cache=update_cache, **kwargs)
-            return async_cache_f
+            if asyncio.iscoroutinefunction(f):
+                async def async_cache_f(*args, update_cache: bool = False, **kwargs):
+                    return await async_run(redis_cache_f, with_context=True, *args,
+                                        update_cache=update_cache, **kwargs)
+                return async_cache_f
 
-        return redis_cache_f
+            return redis_cache_f
 
-    return decorator
+        return decorator
+except ModuleNotFoundError:
+    warnings.warn('pyredis is not installed, [redis_cache] is not cached!!')
+    def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
+        def decorator(f):
+            return f
+        return decorator
 
 
 def _save_data(fs: Writable, tmp_file: Path, data):

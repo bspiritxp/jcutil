@@ -1,4 +1,5 @@
 import os
+import sys
 from colorama import init
 from enum import IntEnum
 from typing import Tuple
@@ -25,6 +26,7 @@ __all__ = (
 
 
 __CHALK_TMPL__ = '\033[{}m'
+__RESET__ = '\033[0m'
 
 
 class Color(IntEnum):
@@ -82,16 +84,13 @@ def __gen_raw__(fgc: Color = None, bgc: Color = None, *styles: FontFormat):
     return __CHALK_TMPL__.format(join(';')(raw))
 
 
-end_all = partial(__gen_raw__, None, None, EndFlag.ALL_END)
-
-
 class Chalk(object):
     def __init__(self, text = None,
                  fgc: Color = None,
                  bgc: Color = None,
                  styles: Tuple[FontFormat] = ()):
         self.__buffer__ = [str(text)] if text else []
-        self.__chains__ = [partial(__gen_raw__, fgc, bgc, *styles)]
+        self.__chains__ = [__gen_raw__(fgc, bgc, *styles)]
         if os.name == 'nt':
             init()
 
@@ -108,16 +107,14 @@ class Chalk(object):
         -------
         Chalk
         """
-        self.__chains__.append(partial(__gen_raw__,
-                                       kwargs.get('fg_color', None),
-                                       kwargs.get('bg_color', None), *args))
+        self.__chains__.append(__gen_raw__(kwargs.get('fg_color', None), kwargs.get('bg_color', None), *args))
         return self
 
     def end(self, *flag: EndFlag):
         if len(flag) > 0:
-            self.__chains__.append(partial(__gen_raw__, None, None, *flag))
+            self.__chains__.append(__gen_raw__(None, None, *flag))
         else:
-            self.__chains__.append(end_all)
+            self.__chains__.append(__RESET__)
         return self
 
     def text(self, text: str):
@@ -134,12 +131,11 @@ class Chalk(object):
         return str(self).expandtabs()
 
     def __str__(self):
-        styles = self.__chains__.copy()
-        texts = self.__buffer__.copy()
-        r = ''
-        while len(styles) > 0:
-            r += styles.pop(0)() + if_else(ilen_gt(0), lambda x: x.pop(0), always(''))(texts)
-        return '{}\033[0m'.format(r)
+        r = []
+        count = max(len(self.__chains__), len(self.__buffer__))
+        for i in range(count):
+            r += self.__chains__[i:i+1] + self.__buffer__[i:i+1]
+        return ''.join(r) + __RESET__
 
     def __len__(self):
         return len(self.__buffer__)
@@ -151,19 +147,22 @@ class Chalk(object):
         ----------
         other : Chalk
         """
-        if isinstance(other, str):
+        if isinstance(other, (str, bytes)):
             self.__buffer__.append(other)
             return self
         new_chalk = Chalk()
-        new_chalk.__chains__ = self.__chains__ + [end_all] + other.__chains__
+        new_chalk.__chains__ = self.__chains__ + [__RESET__] + other.__chains__
         new_chalk.__buffer__ = self.__buffer__ + [' '] + other.__buffer__
         return new_chalk
 
     def __repr__(self):
-        return rf'Chalk<buffSize={len(self.__buffer__)}, chainSize={len(self.__chains__)}>'
+        return rf'Chalk<buff:{self.__buffer__}, chain:{self.__chains__}>'
 
     def __call__(self, *args, **kwargs):
         return str(self)
+
+    def __mod__(self, *args):
+        return str(self) % args
 
 
 RedChalk = partial(Chalk, fgc=Color.RED)

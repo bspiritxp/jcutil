@@ -8,7 +8,7 @@ __all__ = [
     'connect',
     'conn',
     'init_engine',
- ]
+]
 
 __engines = dict()
 
@@ -35,7 +35,8 @@ def init_engine(tag: str, *args, create_engine=None, **kwargs):
         url = '{schema}://{user}:{password}@{dsn}?encoding=utf-8'\
             .format(schema=schema, user=kwargs['user'], password=kwargs['password'],
                     dsn=kwargs['dsn']) if 'url' not in kwargs else kwargs.pop('url')
-        current_engine = sqlmodule.create_engine(url, pool_size=10, encoding='utf-8', **kwargs)
+        current_engine = sqlmodule.create_engine(
+            url, pool_size=10, encoding='utf-8', **kwargs)
     else:
         current_engine = create_engine(*args, **kwargs)
     __engines[tag] = current_engine
@@ -54,10 +55,14 @@ def new_client(tag, *args, create_engine=None, **kwargs):
     return __engines[tag]
 
 
-def connect(n: Union[str, int] = 0):
+def get_client(name: Union[str, int] = 0):
     if len(__engines) > 0:
-        return loc(n, __engines).connect()
+        return loc(name, __engines)
     raise RuntimeError('no any host can connect.')
+
+
+def connect(n: Union[str, int] = 0):
+    return get_client(n).connect()
 
 
 def load(conf: dict):
@@ -86,4 +91,3 @@ conn = connect
 
 def instances():
     return [*__engines.keys()]
-

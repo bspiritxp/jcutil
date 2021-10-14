@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf8') as fh:
 
 setuptools.setup(
     name='jcutil',
-    version='1.0.1',
+    version='1.0.3',
     author='Jochen.He',
     author_email='thjl@hotmail.com',
     description='some python util tools in one package',
@@ -14,6 +14,7 @@ setuptools.setup(
     url='',
     python_requires='>=3.8',
     depends=[
+        'jcramda',
         'colorama',
         'joblib',
         'pymongo',

@@ -3,11 +3,11 @@ from typing import Tuple, List, Callable, ClassVar, NoReturn, Sized
 from functools import partial
 
 
-Color: ClassVar[IntEnum]
+Color: IntEnum
 
-FontFormat: ClassVar[IntEnum]
+FontFormat: IntEnum
 
-EndFlag: ClassVar[IntEnum]
+EndFlag: IntEnum
 
 class Chalk(Sized, Callable):
     def __len__(self) -> int: ...
@@ -17,8 +17,8 @@ class Chalk(Sized, Callable):
     def __add__(self, other: Chalk) -> Chalk: ...
 
     __buffer__: List[str]
-    __chains__: List[Callable[[], str]]
-    def __init__(self, text: str, fgc: Color = ..., bgc: Color = ...,
+    __chains__: List[str]
+    def __init__(self, text: str = ..., fgc: Color = ..., bgc: Color = ...,
                  styles: Tuple[FontFormat] = ...): ...
     def use(self, *args, **kwargs) -> Chalk: ...
     def text(self, text: str) -> Chalk: ...
@@ -26,6 +26,8 @@ class Chalk(Sized, Callable):
     def bold(self, text: str) -> Chalk: ...
     def end(self, *flag: EndFlag) -> Chalk: ...
     def expandtabs(self) -> str: ...
+    @property
+    def raw(self) -> str: ...
 
 
 RedChalk: partial[Chalk]

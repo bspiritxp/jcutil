@@ -15,8 +15,10 @@ python-consul = "^1.1.0"
 pycryptodomex = "^3.10.1"
 APScheduler = "^3.7.0"
 python-redis = "^0.2.2"
+colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]
+SQLAlchemy = "^1.4.22"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

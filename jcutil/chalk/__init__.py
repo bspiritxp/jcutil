@@ -1,27 +1,19 @@
 import os
 import sys
-from colorama import init
 from enum import IntEnum
 from typing import Tuple
-from jcramda import compose, partial, join, if_else, ilen_gt, always, nth, curry
+
+from colorama import init
+from jcramda import compose, partial, join, nth, zip_, first
+
 from jcutil.core import nl_print, c_write
 
-
 __all__ = (
-    'Color',
-    'FontFormat',
-    'Chalk',
-    'EndFlag',
-    'RedChalk',
-    'GreenChalk',
-    'BlackChalk',
-    'BlueChalk',
-    'MagentaChalk',
-    'WhiteChalk',
-    'YellowChalk',
-    'CyanChalk',
-    'show_menu',
-    'select'
+    'Color', 'FontFormat', 'Chalk', 'EndFlag', 'RedChalk', 'GreenChalk', 'BlackChalk',
+    'BlueChalk', 'MagentaChalk', 'WhiteChalk', 'YellowChalk', 'CyanChalk',
+    'show_menu', 'select', 'BoldChalk',
+    'BrightRedChalk', 'BrightBlueChalk', 'BrightCyanChalk', 'BrightBlackChalk', 'BrightGreenChalk',
+    'BrightWhiteChalk', 'BrightYellowChalk', 'BrightMagentaChalk',
 )
 
 
@@ -85,12 +77,14 @@ def __gen_raw__(fgc: Color = None, bgc: Color = None, *styles: FontFormat):
 
 
 class Chalk(object):
-    def __init__(self, text = None,
+    def __init__(self, text=None,
                  fgc: Color = None,
                  bgc: Color = None,
                  styles: Tuple[FontFormat] = ()):
-        self.__buffer__ = [str(text)] if text else []
         self.__chains__ = [__gen_raw__(fgc, bgc, *styles)]
+        self.__buffer__ = []
+        if text:
+            self.text(text)
         if os.name == 'nt':
             init()
 
@@ -107,7 +101,8 @@ class Chalk(object):
         -------
         Chalk
         """
-        self.__chains__.append(__gen_raw__(kwargs.get('fg_color', None), kwargs.get('bg_color', None), *args))
+        self.__chains__.append(__gen_raw__(
+            kwargs.get('fg_color', None), kwargs.get('bg_color', None), *args))
         return self
 
     def end(self, *flag: EndFlag):
@@ -117,8 +112,11 @@ class Chalk(object):
             self.__chains__.append(__RESET__)
         return self
 
+    def _text(self, text: str) -> str:
+        return str(text).replace(__RESET__, first(self.__chains__) or '')
+
     def text(self, text: str):
-        self.__buffer__.append(text)
+        self.__buffer__.append(self._text(text))
         return self
 
     def format(self, text: str, *style: FontFormat):
@@ -126,16 +124,23 @@ class Chalk(object):
 
     def bold(self, text: str):
         self.use(FontFormat.BOLD).text(text)
+        return self
 
     def expandtabs(self):
         return str(self).expandtabs()
 
+    @property
+    def raw(self):
+        return ''.join(self.__buffer__)
+
     def __str__(self):
-        r = []
-        count = max(len(self.__chains__), len(self.__buffer__))
-        for i in range(count):
-            r += self.__chains__[i:i+1] + self.__buffer__[i:i+1]
-        return ''.join(r) + __RESET__
+        # r = []
+        # count = max(len(self.__chains__), len(self.__buffer__))
+        # for i in range(count):
+        #     r += self.__chains__[i:i+1] + self.__buffer__[i:i+1]
+        # return ''.join(r) + __RESET__
+        data = zip_('', self.__chains__, self.__buffer__)
+        return ''.join([f'{c}{t}' for c, t in data]) + __RESET__
 
     def __len__(self):
         return len(self.__buffer__)
@@ -147,12 +152,11 @@ class Chalk(object):
         ----------
         other : Chalk
         """
-        if isinstance(other, (str, bytes)):
-            self.__buffer__.append(other)
-            return self
+        if isinstance(other, str):
+            return str(self) + other
         new_chalk = Chalk()
         new_chalk.__chains__ = self.__chains__ + [__RESET__] + other.__chains__
-        new_chalk.__buffer__ = self.__buffer__ + [' '] + other.__buffer__
+        new_chalk.__buffer__ = self.__buffer__ + [''] + other.__buffer__
         return new_chalk
 
     def __repr__(self):

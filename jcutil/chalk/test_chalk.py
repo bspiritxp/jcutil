@@ -17,14 +17,26 @@ def test_chalk_init():
 def test_add():
     red = RedChalk('hello')
     r = red + ' world'
-    assert len(red.__buffer__) == 2 
-    assert str(r) == '\033[31mhello world\033[0m'
+    assert isinstance(r, str), 'return a star when add a str'
+    assert r == '\033[31mhello\033[0m world'
+    print(r)
+    r = red + GreenChalk('|Mo')
+    assert str(r) == '\033[31mhello\033[0m\033[32m|Mo\033[0m'
     print(r)
 
 def test_mod():
     red = RedChalk('hello %s')
-    print(red())
+    print(red)
     r = red % 'world'
     assert r == '\033[31mhello world\033[0m'
     print(r)
     print(red % 111)
+
+
+def test_wrapper():
+    red = RedChalk('[wappered]')
+    r = GreenChalk(f'a {red} b')
+    print(repr(r))
+    print(r)
+    br = YellowChalk().bold('bold string')
+    print(repr(br), br)

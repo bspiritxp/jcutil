@@ -1,7 +1,7 @@
+from jcutil.server.envars import CONFIG_PATH
 import logging
 from jcutil import consul as kv, chalk
 from jcutil.drivers import smart_load
-from jcutil.server import envars
 
 
 context = {}
@@ -21,15 +21,15 @@ def load_config(*args, v=True):
     -------
 
     """
-    logging.info(envars.CONFIG_PATH)
-    conf = kv.fetch_key(envars.CONFIG_PATH, fmt=kv.ConfigFormat.Yaml)
+    print(CONFIG_PATH)
+    conf = kv.fetch_key(CONFIG_PATH, fmt=kv.ConfigFormat.Yaml)
     if len(args) > 0:
         needed_conf = {}
         for key in ['server', *args]:
             assert key in conf, f'not found [{key}] in kv server.'
             needed_conf[key] = conf[key]
         conf = needed_conf
-    v and logging.info(chalk.GreenChalk(conf))
+    v and print(chalk.GreenChalk(conf))
     try:
         smart_load(conf)
         context['conf'] = conf

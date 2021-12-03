@@ -1,9 +1,13 @@
 from enum import Enum
+from decimal import Decimal
 from typing import Callable
 import consul
+from jcramda.core.operator import identity
 try:
     import hcl
     HasHcl = True
+    def _hcl_load(raw_value):
+        return hcl.loads(raw_value)
 except ModuleNotFoundError:
     HasHcl = False
 
@@ -32,13 +36,11 @@ def _json_load(raw_value):
     import json
     return json.loads(raw_value)
 
-if HasHcl:
-    def _hcl_load(raw_value):
-        import hcl
-        return hcl.loads(raw_value)
-
-
 class ConfigFormat(Enum):
+    Text = str
+    Number = Decimal
+    Int = int
+    Float = float
     Json = _json_load
     Yaml = _yaml_load
     Hcl = _hcl_load if HasHcl else lambda _: None
@@ -70,3 +72,27 @@ def register_service(service_name, **kwargs):
 
 def deregister(service_id):
     Consul().agent.service.deregister(service_id)
+
+
+class KvProperty:
+    def __init__(self, key, /, prefix=None, namespace=None, format=None, cached=None):
+        self.key = key
+        self._prefix = '/'.join(filter(None, (namespace or 'properties', prefix)))
+        self._fmt = format or ConfigFormat.Text
+        self._cached = cached
+    
+    def __get__(self, instance, cls):
+        if instance is None:
+            print(cls)
+            return cls
+        if callable(self.key):
+            name = self.key.__name__
+            func = self.key
+        else:
+            name = self.key
+            func = identity
+        value = func(fetch_key('/'.join([self._prefix, instance.__class__.__name__, name]), self._fmt))
+        print(f'---- get {name} value from remote')
+        if self._cached:
+            setattr(instance, name, value)
+        return value

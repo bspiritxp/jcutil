@@ -1,12 +1,10 @@
 import os
 import socket
+import logging
 from pathlib import Path
 
-try:
-  from dotenv import load_dotenv
-  load_dotenv()
-except ModuleNotFoundError:
-  pass
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def local_ip():
@@ -36,6 +34,9 @@ APP_NAME = os.getenv('APP_NAME', 'app')
 IS_WORKER = str_bool(os.getenv('IS_WORKER'))
 CONFIG_PATH = '/'.join(['config', APP_NAME.lower(), APP_ENV.lower()])
 CACHE_PATH = Path(os.getenv('CACHE_PATH', '/tmp')).resolve()
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+logging.basicConfig(level=LOG_LEVEL)
+
 
 
 __all__ = (

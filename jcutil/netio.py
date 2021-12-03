@@ -1,7 +1,6 @@
 import aiohttp
 import json
 from io import BytesIO
-from .data import mem_cache
 
 
 async def get_json(url, params, **kwargs):
@@ -22,8 +21,10 @@ async def get_json(url, params, **kwargs):
         async with session.get(url, params=params,
                                headers={'content-type': 'application/json'},
                                **kwargs) as resp:
-            return await resp.json() if resp.content_type == 'application/json' \
-                else json.loads(await resp.text())
+            if resp.content_type == 'application/json':
+                return await resp.json()
+            else:
+                return json.loads(await resp.text())
 
 
 async def post_json(url, body, **kwargs):
@@ -51,11 +52,3 @@ async def download(url, **kwargs):
             if resp.status >= 400:
                 return None, None
             return BytesIO(await resp.content.read()), resp.content_type
-
-
-@mem_cache()
-def cache_request(req_func, *args, **kwargs):
-    resp = req_func(*args, **kwargs)
-    if resp.ok and resp.status_code < 400:
-        return resp
-    raise RuntimeError(f'request error: {args[0]}')

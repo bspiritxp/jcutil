@@ -26,7 +26,6 @@ from .defines import CACHE_DEFAULT_DIR, Writable, DEFAULT_CACHE_TIME
 from .core import async_run
 from .core import to_json
 
-_loop = asyncio.get_event_loop()
 
 _obj_encode: Callable = compose(
     base64.encodebytes,
@@ -168,7 +167,7 @@ def persistence(fs: Union[Writable, Callable[[], Writable]], f):
         r = f(*args, **kwargs)
         if r is not None:
             save_opts = (identity(fs), Path(os.path.join(CACHE_DEFAULT_DIR, uuid4().hex)), r)
-            _loop.run_in_executor(None, copy_context().run, partial(_save_data, *save_opts))
+            asyncio.get_event_loop().run_in_executor(None, copy_context().run, partial(_save_data, *save_opts))
         return r
 
     return wrapper

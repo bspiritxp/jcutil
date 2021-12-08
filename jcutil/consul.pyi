@@ -1,16 +1,24 @@
 from enum import Enum
-from typing import ClassVar, Any, NoReturn
+from typing import Callable, Any, NoReturn
 from consul import *
 
 
-ConfigFormat: ClassVar[Enum]
+class ConfigFormat(Enum):
+    Text: Callable
+    Number: Callable
+    Int: Callable
+    Float: Callable
+    Json: Callable
+    Yaml: Callable
+    Hcl: Callable
 
 def path_join(*args: str) -> str: ...
 
-def fetch_key(key_path: str, fmt: ConfigFormat) -> Any: ...
+def fetch_key(key_path: str, fmt: Callable) -> Any: ...
 
 def register_service(service_name: str, **kwargs) -> NoReturn: ...
 
 def deregister(service_id) -> NoReturn: ...
 
-class KvProperty: pass
+class KvProperty:
+  def __init__(self, key: str, /, prefix: str = None, namespace: str = None, format: callable = None, cached: bool = None) -> None: ...

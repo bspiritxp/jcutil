@@ -2,7 +2,7 @@ from enum import Enum
 from decimal import Decimal
 from typing import Callable
 import consul
-from jcramda.core.operator import identity
+from jcramda import identity, decode
 try:
     import hcl
     HasHcl = True
@@ -37,7 +37,7 @@ def _json_load(raw_value):
     return json.loads(raw_value)
 
 class ConfigFormat(Enum):
-    Text = str
+    Text = decode 
     Number = Decimal
     Int = int
     Float = float
@@ -92,7 +92,6 @@ class KvProperty:
             name = self.key
             func = identity
         value = func(fetch_key('/'.join([self._prefix, instance.__class__.__name__, name]), self._fmt))
-        print(f'---- get {name} value from remote')
         if self._cached:
             setattr(instance, name, value)
         return value

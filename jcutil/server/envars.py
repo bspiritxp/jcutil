@@ -1,12 +1,14 @@
 import os
 import socket
 import logging
+from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
 
 
+@lru_cache()
 def local_ip():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect(('180.76.76.76', 80))

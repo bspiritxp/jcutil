@@ -1,3 +1,4 @@
+from collections import namedtuple
 from decimal import Decimal
 from enum import Enum
 from typing import Union, Optional, List, Dict
@@ -14,7 +15,7 @@ from pymongo.collection import Collection, ReturnDocument
 from pymongo.database import Database
 from pymongo.results import InsertOneResult, UpdateResult
 from jcramda import when, is_a, compose, attr, obj, has_attr, first, if_else, not_, popitem, \
-    getitem, in_, _, bind, enum_name, curry
+    getitem, in_, _, bind, enum_name, curry, locnow
 
 
 def fallback_encoder(value):
@@ -59,7 +60,8 @@ class UniqFileGridFSBucket(GridFSBucket):
 
     def open_save_file(self, filename, **kwargs):
         open_by_id = compose(
-            lambda grid_out: self._create_proxy(grid_out, True)(filename, **kwargs),
+            lambda grid_out: self._create_proxy(
+                grid_out, True)(filename, **kwargs),
             first,
         )
         return compose(
@@ -221,7 +223,8 @@ def save(collection, data):
     """
     r = if_else(
         in_(_, '_id'),
-        lambda d: collection.update_one({'_id': data['_id']}, {'$set': d}, upsert=True),
+        lambda d: collection.update_one(
+            {'_id': data['_id']}, {'$set': d}, upsert=True),
         collection.insert_one
     )(data)
     if hasattr(r, 'inserted_id'):
@@ -259,3 +262,40 @@ def replace_one(collection, data):
 
 to_json = dumps
 from_json = loads
+
+
+def mdb_proxy(tag, collection_name):
+
+    proxy_obj = namedtuple(f'{tag}_{collection_name}',
+                           'all,find,add,update,replace,delete')
+    collection = get_collection(tag, collection_name)
+
+    def find(query: dict, **kwargs):
+        return [*collection.find(query, **kwargs)]
+
+    def add(data):
+        new_id = collection.insert_one(
+            {**data, 'createTime': locnow()}).inserted_id
+        return collection.find_one(new_id)
+
+    def update(_id, data, **kwargs):
+        result = collection.update_one({'_id': ObjectId(_id)}, {
+                                       '$set': data, '$currentDate': {'updateTime': True}, '$inc': {'__v': 1}
+                                       }, **kwargs)
+        if result.modified_count:
+            return collection.find_one(ObjectId(_id))
+        return None
+
+    def replace(_id, data, **kwargs):
+        if _id == data.get('_id'):
+            data.pop('_id')
+            result = collection.replace_one({'_id': ObjectId(_id)}, {
+                **data, '__v': data.get('__v', 0)+1, 'updateTime': locnow()})
+            if result.modified_count:
+                return collection.find_one(ObjectId(_id))
+        return None
+
+    def delete(_id):
+        result = collection.delete_one({'_id': ObjectId(_id)})
+        return result.deleted_count
+    return proxy_obj(partial(find, {}), find, add, update, replace, delete)

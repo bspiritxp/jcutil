@@ -6,21 +6,28 @@ import asyncio
 from functools import wraps
 from datetime import timedelta
 from uuid import uuid4
-from typing import Dict, Union
-from pyredis import get_by_url, ClusterPool
+from typing import Union
 from jcramda import loc
 
 
-__clients: Dict[str, ClusterPool] = dict()
+__clients = {}
 
 
 def new_client(uri: str, tag: str = None):
     if tag is None:
         tag = uuid4()
-    __clients[tag] = get_by_url(uri)
+    if uri.startswith('cluster'):
+        from rediscluster import RedisCluster
+        seeds = [{'host': ss[0], 'port': ss[1]}
+                 for entry in uri.lstrip('cluster://').split(',') if (ss := entry.strip().split(':'))]
+        __clients[tag] = RedisCluster(
+            startup_nodes=seeds, decode_responses=True)
+    else:
+        from pyredis import get_by_url
+        __clients[tag] = get_by_url(uri)
 
 
-def connect(tag: Union[str, int] = 0) -> ClusterPool:
+def connect(tag: Union[str, int] = 0):
     pool = loc(tag, __clients)
     if pool:
         return pool
@@ -81,7 +88,8 @@ def interval_lock(flg, name, timeout=timedelta(seconds=3)):
             client = connect(flg)
             time_limit = int(timeout.total_seconds())
             if client.exists(name):
-                raise IntervalLimitError(f'time interval limit in {time_limit}s')
+                raise IntervalLimitError(
+                    f'time interval limit in {time_limit}s')
             client.setnx(name, time.time())
             client.expire(name, time_limit)
             return fn(*args, **kwargs)

@@ -72,6 +72,7 @@ def clear_mem(path: str = '', cache_dir: str = CACHE_DEFAULT_DIR):
 
 try:
     from .drivers import redis
+
     def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
         """
         cache function result in redis.
@@ -136,6 +137,7 @@ try:
         return decorator
 except ModuleNotFoundError:
     warnings.warn('pyredis is not installed, [redis_cache] is not cached!!')
+
     def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
         def decorator(f):
             return f

@@ -3,14 +3,22 @@
 #
 import time
 import asyncio
+from typing import Protocol, Callable, Any
 from functools import wraps
 from datetime import timedelta
 from uuid import uuid4
 from typing import Union
-from jcramda import loc
-
 
 __clients = {}
+
+
+class RedisClientP(Protocol):
+    def exists(self, key) -> bool: ...
+    def get(self, key) -> Any: ...
+    def set(self, key, value) -> int: ...
+    def setnx(self, key, value) -> int: ...
+    def delete(self, key) -> int: ...
+    def expire(self, key, seconds) -> int: ...
 
 
 def new_client(uri: str, tag: str = None):
@@ -18,17 +26,14 @@ def new_client(uri: str, tag: str = None):
         tag = uuid4()
     if uri.startswith('cluster'):
         from rediscluster import RedisCluster
-        seeds = [{'host': ss[0], 'port': ss[1]}
-                 for entry in uri.lstrip('cluster://').split(',') if (ss := entry.strip().split(':'))]
-        __clients[tag] = RedisCluster(
-            startup_nodes=seeds, decode_responses=True)
+        __clients[tag] = RedisCluster.from_url(uri)
     else:
         from pyredis import get_by_url
         __clients[tag] = get_by_url(uri)
 
 
-def connect(tag: Union[str, int] = 0):
-    pool = loc(tag, __clients)
+def connect(tag: Union[str, int] = 0) -> RedisClientP:
+    pool = __clients.get(tag, None)
     if pool:
         return pool
     raise RuntimeWarning(f'Not found redis client with name: {tag}')
@@ -75,6 +80,22 @@ class Lock:
     @property
     def locked(self):
         return self._owner
+
+
+class SpinLock(Lock):
+    def __init__(self, tag, flag, blocking=True, timeout=None):
+        super(SpinLock, self).__init__(tag, flag)
+        self._blocking = blocking
+        self._timeout = timeout
+
+    async def __aenter__(self):
+        r = await self.acquire(self._blocking, self._timeout)
+        if not r:
+            raise RuntimeError(f'Cannot acquire lock: {self._flg}')
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.release()
 
 
 class IntervalLimitError(RuntimeError):

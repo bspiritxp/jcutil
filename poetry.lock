@@ -134,6 +134,14 @@ optional = true
 python-versions = "*"
 
 [[package]]
+name = "decorator"
+version = "5.1.1"
+description = "Decorators for Humans"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
 name = "flake8"
 version = "4.0.1"
 description = "the modular source code checker: pep8 pyflakes and co"
@@ -382,6 +390,20 @@ toml = "*"
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
+name = "pytest-asyncio"
+version = "0.17.2"
+description = "Pytest support for asyncio"
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+pytest = ">=6.1.0"
+
+[package.extras]
+testing = ["coverage (==6.2)", "hypothesis (>=5.7.1)", "flaky (>=3.5.0)", "mypy (==0.931)"]
+
+[[package]]
 name = "python-consul"
 version = "1.1.0"
 description = "Python client for Consul (http://www.consul.io/)"
@@ -582,7 +604,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "405ef528544ae83304e695e5ccb7e4b8560dfbcfb981c37628ddb89b6007b9ce"
+content-hash = "2cdceb3fb11f45fc70c57b192ea5bb264873e588384c9af2d2aa7938716acd23"
 
 [metadata.files]
 aiohttp = [
@@ -707,6 +729,10 @@ crc16 = [
     {file = "crc16-0.1.1.win32-py3.2.exe", hash = "sha256:521643768ff000a7758bc1f1c5e1dc41ae64b42fa57c50e133ab083cfaf9b8f9"},
     {file = "crc16-0.1.1.win32-py3.3.exe", hash = "sha256:63db8577ce0e03b39f30071166c6667659124a65d7fcd38adffe6a34487ce6fb"},
     {file = "crc16-0.1.1.zip", hash = "sha256:1b9f697a93491ae42ed653c1e78ea25a33532afab87b513e6890975450271a01"},
+]
+decorator = [
+    {file = "decorator-5.1.1-py3-none-any.whl", hash = "sha256:b8c3f85900b9dc423225913c5aace94729fe1fa9763b38939a95226f02d37186"},
+    {file = "decorator-5.1.1.tar.gz", hash = "sha256:637996211036b6385ef91435e4fae22989472f9d571faba8927ba8253acbc330"},
 ]
 flake8 = [
     {file = "flake8-4.0.1-py2.py3-none-any.whl", hash = "sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d"},
@@ -1121,6 +1147,10 @@ pyparsing = [
 pytest = [
     {file = "pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
     {file = "pytest-6.2.5.tar.gz", hash = "sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89"},
+]
+pytest-asyncio = [
+    {file = "pytest-asyncio-0.17.2.tar.gz", hash = "sha256:6d895b02432c028e6957d25fc936494e78c6305736e785d9fee408b1efbc7ff4"},
+    {file = "pytest_asyncio-0.17.2-py3-none-any.whl", hash = "sha256:e0fe5dbea40516b661ef1bcfe0bd9461c2847c4ef4bb40012324f2454fb7d56d"},
 ]
 python-consul = [
     {file = "python-consul-1.1.0.tar.gz", hash = "sha256:168f1fa53948047effe4f14d53fc1dab50192e2a2cf7855703f126f469ea11f4"},

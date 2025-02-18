@@ -32,11 +32,11 @@ def init_engine(tag: str, *args, create_engine=None, **kwargs):
     schema = kwargs.get('schema', 'oracle')
     if create_engine is None:
         sqlmodule = import_module('sqlalchemy')
-        url = '{schema}://{user}:{password}@{dsn}?encoding=utf-8'\
+        url = '{schema}://{user}:{password}@{dsn}?{options}'\
             .format(schema=schema, user=kwargs['user'], password=kwargs['password'],
-                    dsn=kwargs['dsn']) if 'url' not in kwargs else kwargs.pop('url')
+                    dsn=kwargs['dsn'], options=kwargs.get('options', '')) if 'url' not in kwargs else kwargs.pop('url')
         current_engine = sqlmodule.create_engine(
-            url, pool_size=10, encoding='utf-8', **kwargs)
+            url, pool_size=10, **kwargs)
     else:
         current_engine = create_engine(*args, **kwargs)
     __engines[tag] = current_engine

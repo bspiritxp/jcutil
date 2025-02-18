@@ -1,6 +1,13 @@
 # JC Util
 
 > Author: Jochen.He
+> Version: 1.2.0
+
+## Installation
+
+```bash
+pip install jcutil
+```
 
 
 module|desc

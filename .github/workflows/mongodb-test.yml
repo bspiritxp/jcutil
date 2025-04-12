@@ -39,7 +39,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-asyncio
+        pip install ruff uv
         pip install -e .
+    
+    - name: Lint with ruff
+      run: |
+        # 执行代码风格检查并自动修复
+        python -m uv pip install --system ruff
+        uvx ruff check src/jcutil/drivers/mongo.py tests/test_mongo.py --fix
+        # 检查是否还有未修复的问题
+        uvx ruff check src/jcutil/drivers/mongo.py tests/test_mongo.py
     
     - name: Test with pytest
       run: |

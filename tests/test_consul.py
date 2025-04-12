@@ -7,7 +7,7 @@ class TestA:
 
   def desc(self):
     print('my name is:', self.name)
-    
+
 
 def test_kvp():
   ta = TestA()

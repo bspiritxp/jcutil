@@ -465,3 +465,61 @@ print(f"CCM模式: {Mode.CCM}")  # 计数器CBC-MAC模式
 print(f"OCB模式: {Mode.OCB}")  # 偏移密码块模式
 print(f"SIV模式: {Mode.SIV}")  # 合成初始化向量模式
 ```
+
+## 开发指南
+
+### 代码质量检查
+
+本项目使用 [Ruff](https://github.com/charliermarsh/ruff) 进行代码静态检查，确保代码风格一致性和代码质量。
+
+#### 本地运行代码检查
+
+##### 使用脚本（推荐）
+
+项目提供了便捷脚本用于检查和自动修复代码风格问题：
+
+- Linux/macOS:
+  ```bash
+  # 确保脚本有执行权限
+  chmod +x scripts/lint.sh
+  # 运行脚本
+  ./scripts/lint.sh
+  ```
+
+- Windows:
+  ```powershell
+  # 运行PowerShell脚本
+  .\scripts\lint.ps1
+  ```
+
+##### 手动运行
+
+如果你已经安装了 uv 和 ruff，可以直接运行：
+
+```bash
+# 检查代码风格问题并自动修复
+uvx ruff check . --fix
+
+# 检查是否还有未修复的问题
+uvx ruff check .
+```
+
+### CI/CD 流程
+
+本项目使用 GitHub Actions 进行持续集成和部署：
+
+1. **每次提交**：运行代码风格检查和单元测试
+2. **发布标签**：当推送 `v*` 格式的标签时，自动构建并发布到 PyPI
+3. **手动触发**：可以通过 GitHub Actions 页面手动触发构建和发布流程
+
+### 贡献代码
+
+如果你想为这个项目贡献代码，请遵循以下步骤：
+
+1. Fork 这个仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交你的更改 (`git commit -m 'feat: add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 打开一个 Pull Request
+
+在提交 PR 前，请确保代码已通过 Ruff 检查且所有测试都能通过。

@@ -9,7 +9,7 @@ import os
 import pickle
 import shutil
 import warnings
-from _contextvars import copy_context
+from contextvars import copy_context
 from datetime import timedelta
 from functools import partial, wraps
 from pathlib import Path

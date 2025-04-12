@@ -1,4 +1,4 @@
-""" 
+"""
 A simple aes encrypt and decrypt module with cryptodome
 Support multiple encryption algorithms including AES, RSA, hash functions and more
 """
@@ -6,6 +6,7 @@ Support multiple encryption algorithms including AES, RSA, hash functions and mo
 import base64
 import binascii
 import hashlib
+import hmac
 from enum import IntEnum
 from typing import Dict, Optional, Tuple, Union
 
@@ -48,12 +49,12 @@ class HashAlgorithm(IntEnum):
 @curry
 def aes_encrypt(key, plain: str, /, mode=None) -> Tuple[str, str]:
     """AES加密函数
-    
+
     Args:
         key: 密钥，可以是十六进制字符串或字节
         plain: 待加密的明文
         mode: 加密模式，默认为AES.MODE_EAX
-        
+
     Returns:
         (密文的十六进制表示, nonce/iv的十六进制表示)
     """
@@ -73,13 +74,13 @@ def aes_encrypt(key, plain: str, /, mode=None) -> Tuple[str, str]:
 @curry
 def aes_decrypt(key, value: str, /, mode=None, nonce_or_iv: str = None) -> str:
     """AES解密函数
-    
+
     Args:
         key: 密钥，可以是十六进制字符串或字节
         value: 待解密的密文（十六进制字符串）
         mode: 解密模式，默认为AES.MODE_EAX
         nonce_or_iv: nonce或iv值（十六进制字符串）
-        
+
     Returns:
         解密后的明文
     """
@@ -101,12 +102,12 @@ def aes_decrypt(key, value: str, /, mode=None, nonce_or_iv: str = None) -> str:
 
 def get_sha1prng_key(key: str) -> str:
     """SHA1PRNG密钥生成
-    
+
     使用SHA1PRNG算法生成与Java AES加密兼容的密钥
-    
+
     Args:
         key: 原始密钥字符串
-        
+
     Returns:
         生成的密钥（十六进制字符串）
     """
@@ -129,13 +130,13 @@ aes_eax_decrypt = aes_decrypt(mode=AES.MODE_EAX)
 # PBKDF2密钥生成
 def pbkdf2_key(password: str, salt: Optional[bytes] = None, iterations: int = DEFAULT_ITERATIONS, key_length: int = 32) -> Tuple[bytes, bytes]:
     """使用PBKDF2算法生成密钥
-    
+
     Args:
         password: 密码明文
         salt: 盐值，如果为None则随机生成
         iterations: 迭代次数，默认10000
         key_length: 密钥长度，默认32字节
-        
+
     Returns:
         (密钥, 盐值)
     """
@@ -147,10 +148,10 @@ def pbkdf2_key(password: str, salt: Optional[bytes] = None, iterations: int = DE
 
 def generate_aes_key(length: int = 32) -> str:
     """生成随机AES密钥
-    
+
     Args:
         length: 密钥长度（字节），默认32
-        
+
     Returns:
         随机密钥（十六进制字符串）
     """
@@ -160,10 +161,10 @@ def generate_aes_key(length: int = 32) -> str:
 # Base64编码解码函数
 def to_base64(data: Union[str, bytes]) -> str:
     """转换为Base64编码
-    
+
     Args:
         data: 待编码的数据，可以是字符串或字节
-        
+
     Returns:
         Base64编码后的字符串
     """
@@ -178,10 +179,10 @@ def to_base64(data: Union[str, bytes]) -> str:
 
 def from_base64(data: str) -> bytes:
     """从Base64解码
-    
+
     Args:
         data: Base64编码的字符串
-        
+
     Returns:
         解码后的字节
     """
@@ -190,10 +191,10 @@ def from_base64(data: str) -> bytes:
 
 def to_base64_url_safe(data: Union[str, bytes]) -> str:
     """转换为URL安全的Base64编码
-    
+
     Args:
         data: 待编码的数据，可以是字符串或字节
-        
+
     Returns:
         URL安全的Base64编码字符串
     """
@@ -208,10 +209,10 @@ def to_base64_url_safe(data: Union[str, bytes]) -> str:
 # 哈希函数
 def hash_sha1(data: Union[str, bytes]) -> str:
     """计算SHA1哈希值
-    
+
     Args:
         data: 待哈希的数据，可以是字符串或字节
-        
+
     Returns:
         十六进制哈希值（大写）
     """
@@ -222,10 +223,10 @@ def hash_sha1(data: Union[str, bytes]) -> str:
 
 def hash_sha256(data: Union[str, bytes]) -> str:
     """计算SHA256哈希值
-    
+
     Args:
         data: 待哈希的数据，可以是字符串或字节
-        
+
     Returns:
         十六进制哈希值（大写）
     """
@@ -236,10 +237,10 @@ def hash_sha256(data: Union[str, bytes]) -> str:
 
 def hash_sha512(data: Union[str, bytes]) -> str:
     """计算SHA512哈希值
-    
+
     Args:
         data: 待哈希的数据，可以是字符串或字节
-        
+
     Returns:
         十六进制哈希值（大写）
     """
@@ -250,10 +251,10 @@ def hash_sha512(data: Union[str, bytes]) -> str:
 
 def hash_md5(data: Union[str, bytes]) -> str:
     """计算MD5哈希值
-    
+
     Args:
         data: 待哈希的数据，可以是字符串或字节
-        
+
     Returns:
         十六进制哈希值（大写）
     """
@@ -264,10 +265,10 @@ def hash_md5(data: Union[str, bytes]) -> str:
 
 def sha3sum(plaintext: Union[str, bytes]) -> str:
     """计算SHA3-256哈希值
-    
+
     Args:
         plaintext: 待哈希的数据，可以是字符串或字节
-        
+
     Returns:
         十六进制哈希值（大写）
     """
@@ -279,11 +280,11 @@ def sha3sum(plaintext: Union[str, bytes]) -> str:
 # HMAC函数
 def hmac_sha256(key: Union[str, bytes], message: Union[str, bytes]) -> str:
     """计算HMAC-SHA256值
-    
+
     Args:
         key: 密钥，可以是字符串或字节
         message: 消息，可以是字符串或字节
-        
+
     Returns:
         十六进制HMAC值（大写）
     """
@@ -297,11 +298,11 @@ def hmac_sha256(key: Union[str, bytes], message: Union[str, bytes]) -> str:
 
 def hmac_sha1(key: Union[str, bytes], message: Union[str, bytes]) -> str:
     """计算HMAC-SHA1值
-    
+
     Args:
         key: 密钥，可以是字符串或字节
         message: 消息，可以是字符串或字节
-        
+
     Returns:
         十六进制HMAC值（大写）
     """
@@ -316,10 +317,10 @@ def hmac_sha1(key: Union[str, bytes], message: Union[str, bytes]) -> str:
 # RSA加解密相关函数
 def generate_rsa_key_pair(bits: int = 2048) -> Dict[str, bytes]:
     """生成RSA密钥对
-    
+
     Args:
         bits: 密钥位数，默认2048
-        
+
     Returns:
         包含私钥和公钥的字典
     """
@@ -334,11 +335,11 @@ def generate_rsa_key_pair(bits: int = 2048) -> Dict[str, bytes]:
 
 def rsa_encrypt(public_key: Union[str, bytes], plain_data: Union[str, bytes]) -> str:
     """RSA加密
-    
+
     Args:
         public_key: RSA公钥，可以是PEM格式的字符串或字节
         plain_data: 待加密的数据，可以是字符串或字节
-        
+
     Returns:
         加密后的数据（Base64编码）
     """
@@ -355,11 +356,11 @@ def rsa_encrypt(public_key: Union[str, bytes], plain_data: Union[str, bytes]) ->
 
 def rsa_decrypt(private_key: Union[str, bytes], cipher_data: str) -> bytes:
     """RSA解密
-    
+
     Args:
         private_key: RSA私钥，可以是PEM格式的字符串或字节
         cipher_data: 待解密的数据（Base64编码）
-        
+
     Returns:
         解密后的原始数据
     """
@@ -374,11 +375,11 @@ def rsa_decrypt(private_key: Union[str, bytes], cipher_data: str) -> bytes:
 
 def rsa_sign(private_key: Union[str, bytes], data: Union[str, bytes]) -> str:
     """RSA签名
-    
+
     Args:
         private_key: RSA私钥，可以是PEM格式的字符串或字节
         data: 待签名的数据，可以是字符串或字节
-        
+
     Returns:
         签名值（Base64编码）
     """
@@ -395,12 +396,12 @@ def rsa_sign(private_key: Union[str, bytes], data: Union[str, bytes]) -> str:
 
 def rsa_verify(public_key: Union[str, bytes], data: Union[str, bytes], signature: str) -> bool:
     """验证RSA签名
-    
+
     Args:
         public_key: RSA公钥，可以是PEM格式的字符串或字节
         data: 原始数据，可以是字符串或字节
         signature: 签名值（Base64编码）
-        
+
     Returns:
         签名是否有效
     """
@@ -421,11 +422,11 @@ def rsa_verify(public_key: Union[str, bytes], data: Union[str, bytes], signature
 # 实用工具函数
 def secure_compare(a: Union[str, bytes], b: Union[str, bytes]) -> bool:
     """安全比较两个字符串或字节，防止时序攻击
-    
+
     Args:
         a: 第一个字符串或字节
         b: 第二个字符串或字节
-        
+
     Returns:
         两个值是否相等
     """
@@ -439,10 +440,10 @@ def secure_compare(a: Union[str, bytes], b: Union[str, bytes]) -> bool:
 
 def generate_random_string(length: int = 16) -> str:
     """生成随机字符串
-    
+
     Args:
         length: 字符串长度，默认16
-        
+
     Returns:
         随机字符串（十六进制）
     """

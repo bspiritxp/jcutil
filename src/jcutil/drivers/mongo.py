@@ -31,7 +31,6 @@ from jcramda import (
     popitem,
     when,
 )
-from pymongo import MongoClient
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.database import Database
 from pymongo.results import InsertOneResult, UpdateResult

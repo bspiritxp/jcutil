@@ -18,7 +18,7 @@ def quick_update(schema, target: str, set_cols, where_cols, data, /,
         where_cols (str, list[str]): Columns that be used in where. 'id,name,somecol' or ['id', 'name', 'somecol']
         data (Iterable, DataFrame): a data that can pass to pd.DataFrame
         mode (str, optional): sql mode: ['update', 'replace']. Defaults to 'update'.
-    
+
     Exceptions:
         ValueError: some column in set_cols or where_cols which is not in target table.
     """

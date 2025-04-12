@@ -1,7 +1,9 @@
 import os
+
 import pytest
-from jcramda import members, hex_token
-from ..src.jcutil.crypto import aes_decrypt, aes_encrypt, to_base64, Mode, sha3sum
+from jcramda import hex_token, members
+
+from ..src.jcutil.crypto import Mode, aes_decrypt, aes_encrypt, sha3sum, to_base64
 
 
 @pytest.fixture()

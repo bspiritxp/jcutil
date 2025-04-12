@@ -60,7 +60,7 @@ async def post_json(url, body, **kwargs):
 async def put_json(url, body, **kwargs):
     """
     PUT method with json request and response
-    
+
     Parameters
     ----------
     url : str
@@ -69,7 +69,7 @@ async def put_json(url, body, **kwargs):
         Request body to be serialized as JSON
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     dict
@@ -83,14 +83,14 @@ async def put_json(url, body, **kwargs):
 async def delete_json(url, **kwargs):
     """
     DELETE method with json response
-    
+
     Parameters
     ----------
     url : str
         API endpoint URL
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     dict
@@ -104,14 +104,14 @@ async def delete_json(url, **kwargs):
 async def download(url, **kwargs):
     """
     Download file from URL
-    
+
     Parameters
     ----------
     url : str
         URL to download from
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     tuple
@@ -127,7 +127,7 @@ async def download(url, **kwargs):
 async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs):
     """
     Download file from URL and save to disk with progress tracking
-    
+
     Parameters
     ----------
     url : str
@@ -138,7 +138,7 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
         Size of chunks to download at once
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     bool
@@ -156,7 +156,7 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
             # Ensure directory exists
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-            total_size = int(resp.headers.get('Content-Length', 0))
+            int(resp.headers.get('Content-Length', 0))
             downloaded = 0
 
             async with aiofiles.open(dest_path, 'wb') as f:
@@ -170,7 +170,7 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
 async def upload_file(url, file_path, field_name='file', additional_data=None, **kwargs):
     """
     Upload file to server using multipart/form-data
-    
+
     Parameters
     ----------
     url : str
@@ -183,7 +183,7 @@ async def upload_file(url, file_path, field_name='file', additional_data=None, *
         Additional form fields to include
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     dict
@@ -211,7 +211,7 @@ async def upload_file(url, file_path, field_name='file', additional_data=None, *
 async def upload_bytes(url, file_bytes, filename, field_name='file', content_type='application/octet-stream', additional_data=None, **kwargs):
     """
     Upload in-memory bytes to server using multipart/form-data
-    
+
     Parameters
     ----------
     url : str
@@ -228,7 +228,7 @@ async def upload_bytes(url, file_bytes, filename, field_name='file', content_typ
         Additional form fields to include
     kwargs : dict
         Additional parameters to pass to the request
-        
+
     Returns
     -------
     dict
@@ -259,7 +259,7 @@ class EventSourceClient:
     def __init__(self, url, headers=None, reconnection_time=3.0, session=None):
         """
         Initialize EventSource client
-        
+
         Parameters
         ----------
         url : str
@@ -293,7 +293,7 @@ class EventSourceClient:
     def on(self, event_name, callback):
         """
         Register callback for specific event type
-        
+
         Parameters
         ----------
         event_name : str
@@ -383,7 +383,7 @@ class WebSocketClient:
     def __init__(self, url, headers=None, session=None):
         """
         Initialize WebSocket client
-        
+
         Parameters
         ----------
         url : str
@@ -415,7 +415,7 @@ class WebSocketClient:
     def on(self, event_type, callback):
         """
         Register callback for specific event
-        
+
         Parameters
         ----------
         event_type : str
@@ -451,7 +451,7 @@ class WebSocketClient:
     async def send_text(self, message):
         """
         Send text message to WebSocket
-        
+
         Parameters
         ----------
         message : str
@@ -464,7 +464,7 @@ class WebSocketClient:
     async def send_json(self, data):
         """
         Send JSON message to WebSocket
-        
+
         Parameters
         ----------
         data : dict
@@ -477,7 +477,7 @@ class WebSocketClient:
     async def send_bytes(self, data):
         """
         Send binary message to WebSocket
-        
+
         Parameters
         ----------
         data : bytes
@@ -490,7 +490,7 @@ class WebSocketClient:
     async def receive(self):
         """
         Receive a single message from WebSocket
-        
+
         Returns
         -------
         aiohttp.WSMessage

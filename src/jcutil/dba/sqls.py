@@ -19,7 +19,7 @@ _value_check = when(
 )
 
 
-class where:
+class Where:
   def __init__(self, raw):
       self.raw = raw
 

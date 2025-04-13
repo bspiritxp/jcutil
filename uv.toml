@@ -1,0 +1,15 @@
+# uv 工具配置文件
+# 正确的 index 配置格式
+
+# 定义 PyPI 索引
+[[index]]
+name = "pypi"
+url = "https://upload.pypi.org/legacy/"
+verify-ssl = true
+
+# 定义 TestPyPI 索引
+[[index]]
+name = "testpypi"
+url = "https://test.pypi.org/legacy/"
+verify-ssl = true
+

@@ -50,9 +50,9 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -82,11 +82,11 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
     
     - name: Build package
       run: uv build
@@ -126,7 +126,7 @@ jobs:
         UV_PYPI_USERNAME: ${{ secrets.PYPI_TEST_USERNAME }}
         UV_PYPI_PASSWORD: ${{ secrets.PYPI_TEST_PASSWORD }}
       run: |
-        uv pip publish --repository-url https://test.pypi.org/legacy/ dist/*
+        uv publish --repository-url https://test.pypi.org/legacy/ dist/*
 
   publish:
     needs: build
@@ -142,9 +142,9 @@ jobs:
         path: dist/
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
     
     - name: Install dependencies
       run: |
@@ -156,4 +156,4 @@ jobs:
         UV_PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
         UV_PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        uv pip publish dist/* 
+        uv publish dist/* 

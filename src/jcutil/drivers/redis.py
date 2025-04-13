@@ -28,7 +28,7 @@ async def new_client(uri: str, tag: str = None):
         tag = uuid4()
 
     if uri.startswith('cluster'):
-        __clients[tag] = await RedisCluster.from_url(uri)
+        __clients[tag] = RedisCluster.from_url(uri)
     else:
         __clients[tag] = Redis.from_url(uri)
 

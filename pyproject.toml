@@ -1,6 +1,6 @@
 [project]
 name = "jcutil"
-version = "2.0.0"
+version = "2.0.1"
 description = "A tool chain for the web service"
 readme = "README.md"
 license = {text = "MIT"}

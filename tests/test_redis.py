@@ -5,7 +5,7 @@ import os
 import pytest
 import yaml
 
-from src.jcutil.drivers.redis import Lock, SpinLock, connect, load, new_client
+from jcutil.drivers.redis import Lock, SpinLock, connect, load, new_client
 
 
 @pytest.fixture

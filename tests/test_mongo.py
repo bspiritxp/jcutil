@@ -1,7 +1,7 @@
 
 import pytest
 
-from src.jcutil.drivers.mongo import MongoClient, get_client, new_client
+from jcutil.drivers.mongo import MongoClient, get_client, new_client
 
 # 测试MongoDB连接
 # 运行测试前请确保有MongoDB服务器运行在本地27017端口

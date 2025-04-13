@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Union
 from uuid import uuid4
 
 import motor.motor_asyncio
-import motor.motor_tornado
 import pymongo
 import pytz
 from bson import CodecOptions, Decimal128, ObjectId
@@ -34,7 +33,12 @@ from jcramda import (
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.database import Database
 from pymongo.results import InsertOneResult, UpdateResult
+from bson.objectid import ObjectId
+from pymongo import MongoClient as PyMongoClient
+from pymongo.errors import DuplicateKeyError
 
+from jcutil.core import get_running_loop
+from jcramda import locnow
 
 def fallback_encoder(value):
     return when(
@@ -162,8 +166,15 @@ class MongoClient:
         self.uri = uri
         self.alias = alias if alias is not None else uuid4().hex
         self.sync_client = pymongo.MongoClient(uri)
-        self.async_client = motor.motor_asyncio.AsyncIOMotorClient(uri)
-        self.default_db_name = self.sync_client.get_default_database().name if self.sync_client.get_default_database() else None
+        
+        # Use the same event loop for all async operations
+        loop = get_running_loop()
+        self.async_client = motor.motor_asyncio.AsyncIOMotorClient(
+            uri, 
+            io_loop=loop
+        )
+        
+        self.default_db_name = self.sync_client.get_default_database().name if self.sync_client.get_default_database() is not None else None
 
         # 配置编解码选项
         self.codec_options = CodecOptions(
@@ -180,6 +191,9 @@ class MongoClient:
 
     def get_async_database(self, db_name=None):
         """获取异步数据库对象"""
+        # Ensure we have a valid async client
+        self._ensure_valid_async_client()
+        
         if db_name is None:
             if self.default_db_name:
                 return self.async_client[self.default_db_name]
@@ -194,9 +208,34 @@ class MongoClient:
 
     def get_async_collection(self, collection_name: Union[str, Enum], db_name=None):
         """获取异步集合对象"""
+        # Ensure we have a valid async client
+        self._ensure_valid_async_client()
+        
         db = self.get_async_database(db_name)
         collection_name = enum_name(collection_name)
         return db.get_collection(collection_name, codec_options=self.codec_options)
+
+    def _ensure_valid_async_client(self):
+        """确保异步客户端使用有效的事件循环"""
+        try:
+            # Try to get the loop used by the async client
+            loop = self.async_client.get_io_loop()
+            # Check if the loop is closed
+            if loop.is_closed():
+                # Create a new async client with a valid loop
+                loop = get_running_loop()
+                self.async_client = motor.motor_asyncio.AsyncIOMotorClient(
+                    self.uri, 
+                    io_loop=loop
+                )
+        except (RuntimeError, AttributeError):
+            # If we can't get the loop or there's another issue,
+            # create a new async client with a valid loop
+            loop = get_running_loop()
+            self.async_client = motor.motor_asyncio.AsyncIOMotorClient(
+                self.uri, 
+                io_loop=loop
+            )
 
     def get_fs(self, db_name=None) -> GridFS:
         """获取同步GridFS对象"""

@@ -66,12 +66,29 @@ class SafeJsonDecoder(JSONDecoder):
 
 
 to_json = partial(dumps, cls=SafeJsonEncoder, ensure_ascii=False)
-to_json_file = partial(dump, cls=SafeJsonEncoder, ensure_ascii=False)
+
+def to_json_file(obj, fp, **kwargs):
+    """将对象序列化为JSON并写入文件
+    
+    Args:
+        obj: 要序列化的对象
+        fp: 文件路径或文件对象
+        **kwargs: 其他传递给json.dump的参数
+    """
+    kwargs.setdefault('cls', SafeJsonEncoder)
+    kwargs.setdefault('ensure_ascii', False)
+    
+    if isinstance(fp, str):
+        with open(fp, 'w', encoding='utf-8') as f:
+            dump(obj, f, **kwargs)
+    else:
+        dump(obj, fp, **kwargs)
+
 
 DocFixedOpt = namedtuple('DocFixedOpt', 'where, fixed')
 
 
-def fix_document(doc, fix_options: Iterable[DocFixedOpt]):
+def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
     if is_a_mapper(doc):
         r = {}
         for k, v in doc.items():

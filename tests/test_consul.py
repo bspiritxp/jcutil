@@ -1,3 +1,4 @@
+import pytest
 from jcutil.consul import ConfigFormat, KvProperty
 
 
@@ -9,6 +10,7 @@ class TestA:
     print('my name is:', self.name)
 
 
+@pytest.mark.skip(reason="需要配置Consul服务才能运行此测试")
 def test_kvp():
   ta = TestA()
   ta.desc()

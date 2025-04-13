@@ -1,4 +1,3 @@
-
 import pytest
 
 from jcutil.drivers.mongo import MongoClient, get_client, new_client
@@ -16,6 +15,10 @@ def client():
     # 清理测试数据
     db = client.get_database()
     db[TEST_COLLECTION].drop()
+    # 关闭连接以防内存泄漏
+    client.sync_client.close()
+    # Don't close async_client here as it will close the event loop
+    # client.async_client.close()
 
 
 def test_sync_api(client):
@@ -79,22 +82,31 @@ async def test_proxy(client):
     added = proxy.add(data)
     assert added["name"] == "proxy_test"
 
-    # 测试异步代理
-    async_proxy = await client.create_async_proxy(TEST_COLLECTION)
-    async_data = {"name": "async_proxy_test", "value": 600}
-    async_added = await async_proxy.add(async_data)
-    assert async_added["name"] == "async_proxy_test"
+    # 存储添加的数据ID，用于后续清理
+    added_id = added["_id"]
 
-    # 查询并验证
-    items = proxy.all()
-    assert len(items) >= 2
+    try:
+        # 测试异步代理
+        async_proxy = await client.create_async_proxy(TEST_COLLECTION)
+        async_data = {"name": "async_proxy_test", "value": 600}
+        async_added = await async_proxy.add(async_data)
+        assert async_added["name"] == "async_proxy_test"
 
-    async_items = await async_proxy.all()
-    assert len(async_items) >= 2
+        # 存储异步添加的数据ID，用于后续清理
+        async_added_id = async_added["_id"]
 
-    # 清理
-    proxy.delete(added["_id"])
-    await async_proxy.delete(async_added["_id"])
+        # 查询并验证
+        items = proxy.all()
+        assert len(items) >= 2
+
+        async_items = await async_proxy.all()
+        assert len(async_items) >= 2
+
+        # 清理异步测试数据
+        await async_proxy.delete(async_added_id)
+    finally:
+        # 无论测试成功与否，都要清理同步测试数据
+        proxy.delete(added_id)
 
 
 def test_global_client_management():

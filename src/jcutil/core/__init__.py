@@ -37,15 +37,46 @@ __all__ = (
     'obj_dumps',
     'obj_loads',
     'init_event_loop',
+    'get_running_loop',
     'map_async',
+    'utcnow',
 )
 
 
 def init_event_loop():
     try:
-        loop = asyncio.get_event_loop()
+        # In Python 3.13+, get_event_loop() is deprecated
+        # Use get_running_loop() or new_event_loop() instead
+        try:
+            # Try to get the running loop first
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # If no running loop, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
     except RuntimeError:
+        # Fallback for older Python versions
         loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
+def get_running_loop():
+    """
+    Get the current running loop or create and set a new one if none exists.
+    This function is designed to be safely used in async test environments,
+    as it doesn't close the loop.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # Check if the loop is closed
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        # No running loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     return loop
 
 
@@ -73,24 +104,37 @@ clear = partial(os.system, 'clear')
 # async run
 async def async_run(sync_func, *args, with_context=False, **kwargs):
     """
+    Run a synchronous function in a thread executor asynchronously.
 
     Parameters
     ----------
-    with_context:bool
-            是否要copy当前进程的context， 默认：False
-    sync_func
-    args
-    kwargs:
+    with_context : bool
+        Whether to copy the current process context, default: False
+    sync_func : callable
+        The synchronous function to run
+    args : tuple
+        Positional arguments to pass to the function
+    kwargs : dict
+        Keyword arguments to pass to the function
 
     Returns
     -------
-
+    Any
+        The result of the function call
     """
-    loop = init_event_loop()
+    loop = get_running_loop()
     fn = partial(sync_func, *args, **kwargs)
     if with_context:
         fn = partial(copy_context().run, fn)
-    return await loop.run_in_executor(None, fn)
+    try:
+        return await loop.run_in_executor(None, fn)
+    except RuntimeError as e:
+        # If event loop is closed, get a new one and try again
+        if "Event loop is closed" in str(e):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return await loop.run_in_executor(None, fn)
+        raise
 
 
 def load_fc(fc_name, module_name=None):
@@ -123,8 +167,12 @@ def _splitor(data, start, limit):
 
 def map_async(func, data, limit=None, splitor=_splitor):
     if limit is None:
-        limit = int(len(data) / os.cpu_count())
-    loop = init_event_loop()
+        cpu_count = os.cpu_count() or 1
+        data_len = len(data)
+        # If data is smaller than CPU count, use 1 as limit
+        # to ensure we process at least one item per chunk
+        limit = max(1, int(data_len / cpu_count))
+    loop = get_running_loop()
     tasks = []
     start = 0
     block = splitor(data, start, limit)
@@ -134,6 +182,11 @@ def map_async(func, data, limit=None, splitor=_splitor):
             start += limit
             block = splitor(data, start, limit)
 
-    result = loop.run_until_complete(asyncio.gather(*tasks, loop=loop))
+    result = loop.run_until_complete(asyncio.gather(*tasks))
     return flatten(result)
+
+
+def utcnow():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
 

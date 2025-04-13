@@ -1,3 +1,6 @@
 redis:
   test: redis://127.0.0.1:6379
   cache: redis://127.0.0.1:6379/1 
+mongo:
+  test: mongodb://127.0.0.1:27017/test_db
+  cache: mongodb://127.0.0.1:27017/cache_db

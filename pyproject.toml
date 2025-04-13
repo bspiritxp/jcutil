@@ -3,6 +3,7 @@ name = "jcutil"
 version = "2.0.0"
 description = "A tool chain for the web service"
 readme = "README.md"
+license = {text = "MIT"}
 authors = [
     { name = "Jochen.he", email = "thjl@hotmail.com" }
 ]
@@ -12,6 +13,7 @@ dependencies = [
     "colorama>=0.4.6",
     "jcramda>=1.0.6",
     "joblib>=1.4.2",
+    "motor>=3.5.1",
     "pandas>=2.0.3",
     "py-consul>=1.6.0",
     "pycryptodomex>=3.22.0",
@@ -20,6 +22,7 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "pyyaml>=6.0.2",
     "redis>=5.2.1",
+    "tornado>=6.3.3",
 ]
 
 

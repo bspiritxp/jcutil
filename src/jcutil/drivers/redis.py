@@ -4,7 +4,7 @@
 import asyncio
 import time
 from datetime import timedelta
-from functools import wraps
+from functools import wraps, partial
 from typing import Any, Optional, Protocol, Union
 from uuid import uuid4
 
@@ -47,7 +47,7 @@ async def load(conf: dict):
             # print(f'redis: {key} connected')
 
 
-conn = connect
+conn = get_client = connect
 
 
 class Lock:

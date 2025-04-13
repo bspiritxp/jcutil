@@ -3,12 +3,13 @@ import logging
 import os
 
 import pytest
+import pytest_asyncio
 import yaml
 
 from jcutil.drivers.redis import Lock, SpinLock, connect, load, new_client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def setup_redis():
     """设置Redis测试连接"""
     # 如果存在测试配置文件，则使用配置文件
@@ -40,16 +41,17 @@ async def test_redis_basic_operations(setup_redis):
     assert await client.set(test_key, test_value) is True
 
     # 测试获取值
-    assert await client.get(test_key) == test_value
+    result = await client.get(test_key)
+    assert result.decode('utf-8') == test_value
 
     # 测试键存在
-    assert await client.exists(test_key) is True
+    assert await client.exists(test_key) == 1
 
     # 测试删除键
     assert await client.delete(test_key) == 1
 
     # 确认键已删除
-    assert await client.exists(test_key) is False
+    assert await client.exists(test_key) == 0
 
 
 @pytest.mark.asyncio
@@ -62,13 +64,13 @@ async def test_redis_expire(setup_redis):
     await client.set(test_key, 'temporary', ex=2)
 
     # 键应该存在
-    assert await client.exists(test_key) is True
+    assert await client.exists(test_key) == 1
 
     # 等待过期
     await asyncio.sleep(3)
 
     # 键应该已过期
-    assert await client.exists(test_key) is False
+    assert await client.exists(test_key) == 0
 
 
 @pytest.mark.asyncio

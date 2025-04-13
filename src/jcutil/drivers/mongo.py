@@ -572,8 +572,8 @@ def save(collection, data):
             data['_id'] = r.upserted_id
     else:
         r = collection.insert_one(data)
-        if hasattr(r, 'inserted_id'):
-            data['_id'] = r.inserted_id
+    if hasattr(r, 'inserted_id'):
+        data['_id'] = r.inserted_id
     return data
 
 

@@ -69,7 +69,7 @@ to_json = partial(dumps, cls=SafeJsonEncoder, ensure_ascii=False)
 
 def to_json_file(obj, fp, **kwargs):
     """将对象序列化为JSON并写入文件
-    
+
     Args:
         obj: 要序列化的对象
         fp: 文件路径或文件对象
@@ -77,7 +77,7 @@ def to_json_file(obj, fp, **kwargs):
     """
     kwargs.setdefault('cls', SafeJsonEncoder)
     kwargs.setdefault('ensure_ascii', False)
-    
+
     if isinstance(fp, str):
         with open(fp, 'w', encoding='utf-8') as f:
             dump(obj, f, **kwargs)

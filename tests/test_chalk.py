@@ -5,6 +5,7 @@
 """
 import io
 import sys
+
 import pytest
 
 from jcutil.chalk import (
@@ -25,9 +26,9 @@ def capture_stdout():
     captured_output = io.StringIO()
     old_stdout = sys.stdout
     sys.stdout = captured_output
-    
+
     yield captured_output
-    
+
     # 恢复标准输出
     sys.stdout = old_stdout
     # 打印捕获的输出，方便调试

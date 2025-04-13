@@ -1,6 +1,6 @@
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import consul as py_consul
 import hcl
@@ -107,11 +107,11 @@ class ConsulClient:
 
     def session_create(self, name: str = None, **kwargs) -> str:
         """创建会话
-        
+
         Args:
             name: 会话名称
             **kwargs: 其他参数，如ttl、lock_delay等
-            
+
         Returns:
             会话ID
         """
@@ -120,10 +120,10 @@ class ConsulClient:
 
     def session_destroy(self, session_id: str) -> bool:
         """销毁会话
-        
+
         Args:
             session_id: 会话ID
-            
+
         Returns:
             是否成功
         """
@@ -131,10 +131,10 @@ class ConsulClient:
 
     def session_renew(self, session_id: str) -> bool:
         """续约会话
-        
+
         Args:
             session_id: 会话ID
-            
+
         Returns:
             是否成功
         """
@@ -146,12 +146,12 @@ class ConsulClient:
 
     def lock_acquire(self, key: str, session_id: str, value: str = None) -> bool:
         """获取分布式锁
-        
+
         Args:
             key: 锁键值
             session_id: 会话ID
             value: 锁的值，默认为None
-            
+
         Returns:
             是否成功获取锁
         """
@@ -159,11 +159,11 @@ class ConsulClient:
 
     def lock_release(self, key: str, session_id: str) -> bool:
         """释放分布式锁
-        
+
         Args:
             key: 锁键值
             session_id: 会话ID
-            
+
         Returns:
             是否成功释放锁
         """
@@ -264,7 +264,7 @@ def find_service(query: str, by_id: bool = False, client: Optional[ConsulClient]
     """
     client = client or _default_client
     services = client.services()
-    
+
     if by_id:
         # 直接按ID查找
         return {k: v for k, v in services.items() if k == query}

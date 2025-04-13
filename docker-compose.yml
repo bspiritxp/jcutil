@@ -1,0 +1,49 @@
+services:
+  # MongoDB 服务
+  mongodb:
+    image: mongo:latest
+    container_name: jcutil-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    # 启动健康检查
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      # 无认证模式
+      - MONGO_INITDB_DATABASE=test_db
+    restart: unless-stopped
+    networks:
+      - jcutil-network
+
+  # Redis 服务
+  redis:
+    image: redis:7.2-alpine
+    container_name: jcutil-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    # 启动健康检查
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - jcutil-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  jcutil-network:
+    driver: bridge

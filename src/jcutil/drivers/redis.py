@@ -4,7 +4,7 @@
 import asyncio
 import time
 from datetime import timedelta
-from functools import wraps, partial
+from functools import wraps
 from typing import Any, Optional, Protocol, Union
 from uuid import uuid4
 

@@ -1,4 +1,5 @@
 import pytest
+
 from jcutil.consul import ConfigFormat, KvProperty
 
 

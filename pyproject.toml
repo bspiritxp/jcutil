@@ -1,6 +1,6 @@
 [project]
+dynamic = ["version"]
 name = "jcutil"
-version = "2.0.1"
 description = "A tool chain for the web service"
 readme = "README.md"
 license = {text = "MIT"}
@@ -68,3 +68,6 @@ line-ending = "auto"
 # 导入设置
 [tool.ruff.lint.isort]
 known-first-party = ["jcutil"]
+
+[tool.hatch.version]
+path = "src/jcutil/__init__.py"

@@ -9,32 +9,32 @@ from jcramda import depop, from_import_as
 from .core import host_mac
 
 __all__ = (
-    'SchedulerType',
-    'create_by_mongo',
-    'scheduler',
-    'job2dict',
-    'default_store_opts',
+    "SchedulerType",
+    "create_by_mongo",
+    "scheduler",
+    "job2dict",
+    "default_store_opts",
 )
 
 
-ERR_MSG = 'scheduler is not created'
+ERR_MSG = "scheduler is not created"
 
 
 def job2dict(job):
     if not job:
         return {}
     return {
-        'id': job.id,
-        'name': job.name,
-        'trigger': job.trigger,
-        'func': job.func.__name__,
-        'executor': job.executor,
-        'args': job.args,
-        'kwargs': job.kwargs,
-        'max_instances': job.max_instances,
-        'next_run_time': job.next_run_time,
-        'misfire_grace_time': job.misfire_grace_time,
-        'coalesce': job.coalesce,
+        "id": job.id,
+        "name": job.name,
+        "trigger": job.trigger,
+        "func": job.func.__name__,
+        "executor": job.executor,
+        "args": job.args,
+        "kwargs": job.kwargs,
+        "max_instances": job.max_instances,
+        "next_run_time": job.next_run_time,
+        "misfire_grace_time": job.misfire_grace_time,
+        "coalesce": job.coalesce,
     }
 
 
@@ -50,7 +50,7 @@ class SchedulerManager(object):
     async def start(self):
         cron = self.instance
         assert cron, ERR_MSG
-        assert not cron.running, 'scheduler is already running'
+        assert not cron.running, "scheduler is already running"
         await scheduler.lock.acquire()
         cron.start()
         while scheduler.lock.locked():
@@ -58,7 +58,7 @@ class SchedulerManager(object):
 
     def stop(self):
         assert self.instance, ERR_MSG
-        assert self.instance.running, 'scheduler is not running'
+        assert self.instance.running, "scheduler is not running"
         self.instance.shutdown()
         scheduler.lock.release()
 
@@ -118,16 +118,16 @@ class SchedulerManager(object):
         -------
 
         """
-        assert self.instance, 'scheduler is not created'
+        assert self.instance, "scheduler is not created"
         return self.instance.add_job(func, **job_opts)
 
     def modify(self, job_id, change):
         job = self.store.lookup_job(job_id)
-        assert job, f'not found job by id {job_id}'
-        if 'args' in change or 'kw' in change:
-            args, kw = depop(['args', 'kw'], change)
+        assert job, f"not found job by id {job_id}"
+        if "args" in change or "kw" in change:
+            args, kw = depop(["args", "kw"], change)
             job = self.instance.modify_job(job_id, args=args, kwargs=kw)
-        if 'trigger' in change:
+        if "trigger" in change:
             job = self.instance.reschedule_job(job_id, **change)
         return job2dict(job)
 
@@ -147,19 +147,20 @@ class SchedulerManager(object):
 
 
 class SchedulerType(Enum):
-    ASYNC = 'apscheduler.schedulers.asyncio:AsyncIOScheduler'
-    BACKGROUND = 'apscheduler.schedulers.background:BackgroundScheduler'
-    SYNC = 'apscheduler.schedulers.blocking:BlockingScheduler'
+    ASYNC = "apscheduler.schedulers.asyncio:AsyncIOScheduler"
+    BACKGROUND = "apscheduler.schedulers.background:BackgroundScheduler"
+    SYNC = "apscheduler.schedulers.blocking:BlockingScheduler"
 
 
 scheduler = SchedulerManager()
 
 
-def create_by_mongo(s_type: SchedulerType = SchedulerType.BACKGROUND,
-                    **mongo_store_opts) -> SchedulerManager:
-    assert scheduler.instance is None, 'scheduler is already created'
+def create_by_mongo(
+    s_type: SchedulerType = SchedulerType.BACKGROUND, **mongo_store_opts
+) -> SchedulerManager:
+    assert scheduler.instance is None, "scheduler is already created"
     clazz = from_import_as(s_type.value)
-    assert clazz, f'not found scheduler class named: {s_type.value}'
+    assert clazz, f"not found scheduler class named: {s_type.value}"
     instance: BaseScheduler = clazz()
     scheduler.store = MongoDBJobStore(**mongo_store_opts)
     instance.add_jobstore(scheduler.store)
@@ -170,9 +171,10 @@ def create_by_mongo(s_type: SchedulerType = SchedulerType.BACKGROUND,
 def default_store_opts(node=None) -> dict:
     node_id = node if node else host_mac()
     from .drivers import mongo
+
     mongo_client = mongo.conn()
     return {
-        'collection': f'jobs.{node_id}',
-        'database': mongo_client.get_default_database().name,
-        'client': mongo_client
+        "collection": f"jobs.{node_id}",
+        "database": mongo_client.get_default_database().name,
+        "client": mongo_client,
     }

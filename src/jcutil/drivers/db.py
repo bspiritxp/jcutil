@@ -5,9 +5,9 @@ from typing import Union
 from jcramda import loc
 
 __all__ = [
-    'connect',
-    'conn',
-    'init_engine',
+    "connect",
+    "conn",
+    "init_engine",
 ]
 
 __engines = dict()
@@ -29,14 +29,22 @@ def init_engine(tag: str, *args, create_engine=None, **kwargs):
 
     :return:
     """
-    schema = kwargs.get('schema', 'oracle')
+    schema = kwargs.get("schema", "oracle")
     if create_engine is None:
-        sqlmodule = import_module('sqlalchemy')
-        url = '{schema}://{user}:{password}@{dsn}?encoding=utf-8'\
-            .format(schema=schema, user=kwargs['user'], password=kwargs['password'],
-                    dsn=kwargs['dsn']) if 'url' not in kwargs else kwargs.pop('url')
+        sqlmodule = import_module("sqlalchemy")
+        url = (
+            "{schema}://{user}:{password}@{dsn}?encoding=utf-8".format(
+                schema=schema,
+                user=kwargs["user"],
+                password=kwargs["password"],
+                dsn=kwargs["dsn"],
+            )
+            if "url" not in kwargs
+            else kwargs.pop("url")
+        )
         current_engine = sqlmodule.create_engine(
-            url, pool_size=10, encoding='utf-8', **kwargs)
+            url, pool_size=10, encoding="utf-8", **kwargs
+        )
     else:
         current_engine = create_engine(*args, **kwargs)
     __engines[tag] = current_engine
@@ -46,8 +54,8 @@ def init_engine(tag: str, *args, create_engine=None, **kwargs):
 def new_client(tag, *args, create_engine=None, **kwargs):
     if create_engine is None:
         try:
-            module = import_module('sqlalchemy')
-            create_engine = getattr(module, 'create_engine')
+            module = import_module("sqlalchemy")
+            create_engine = getattr(module, "create_engine")
         except ModuleNotFoundError as err:
             logging.error(err)
 
@@ -58,7 +66,7 @@ def new_client(tag, *args, create_engine=None, **kwargs):
 def get_client(name: Union[str, int] = 0):
     if len(__engines) > 0:
         return loc(name, __engines)
-    raise RuntimeError('no any host can connect.')
+    raise RuntimeError("no any host can connect.")
 
 
 def connect(n: Union[str, int] = 0):
@@ -82,7 +90,7 @@ def load(conf: dict):
             try:
                 init_engine(key, url=conf[key])
             except Exception as err:
-                logging.warning(f'load database [{key}] failed: {err}')
+                logging.warning(f"load database [{key}] failed: {err}")
             # print(f'database [{key}] connected')
 
 

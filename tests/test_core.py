@@ -3,6 +3,7 @@
 
 此测试文件验证jcutil.core模块中的核心功能，包括JSON处理、对象序列化和异步操作等。
 """
+
 import tempfile
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def test_json_serialization():
         "boolean": True,
         "null": None,
         "array": [1, 2, 3],
-        "object": {"a": 1, "b": 2}
+        "object": {"a": 1, "b": 2},
     }
 
     # 测试to_json
@@ -55,7 +56,7 @@ def test_json_file_operations():
     data = {"test": "file_operation", "value": 123}
 
     # 创建临时文件
-    with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
         temp_path = temp_file.name
 
     try:
@@ -74,6 +75,7 @@ def test_json_file_operations():
 @pytest.mark.asyncio
 async def test_async_functions():
     """测试异步功能"""
+
     def sync_func(x):
         return x * 2
 

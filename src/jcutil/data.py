@@ -30,21 +30,15 @@ from joblib import dump, memory
 from .core import to_json
 from .defines import CACHE_DEFAULT_DIR, DEFAULT_CACHE_TIME, Writable
 
-_obj_encode: Callable = compose(
-    base64.encodebytes,
-    pickle.dumps
-)
+_obj_encode: Callable = compose(base64.encodebytes, pickle.dumps)
 
-_obj_decode: Callable = compose(
-    pickle.loads,
-    base64.decodebytes
-)
+_obj_decode: Callable = compose(pickle.loads, base64.decodebytes)
 
 __all__ = [
-    'mem_cache',
-    'redis_cache',
-    'persistence',
-    'clear_mem',
+    "mem_cache",
+    "redis_cache",
+    "persistence",
+    "clear_mem",
 ]
 
 
@@ -65,10 +59,10 @@ def mem_cache(cache_dir: str = CACHE_DEFAULT_DIR):
     return mem.cache
 
 
-def clear_mem(path: str = '', cache_dir: str = CACHE_DEFAULT_DIR):
-    if '.' in path and '/' not in path:
-        path = path.replace('.', os.path.sep)
-    location = os.path.join(cache_dir, 'joblib', path)
+def clear_mem(path: str = "", cache_dir: str = CACHE_DEFAULT_DIR):
+    if "." in path and "/" not in path:
+        path = path.replace(".", os.path.sep)
+    location = os.path.join(cache_dir, "joblib", path)
     shutil.rmtree(location, ignore_errors=True)
     # warnings.warn(f'delete {location}')
 
@@ -76,7 +70,12 @@ def clear_mem(path: str = '', cache_dir: str = CACHE_DEFAULT_DIR):
 try:
     from .drivers import redis
 
-    def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
+    def redis_cache(
+        expires=DEFAULT_CACHE_TIME,
+        prefix=None,
+        redis_connector=None,
+        result_assert=None,
+    ):
         """
         cache function result in redis.
         result cache will be override by same process call
@@ -99,19 +98,19 @@ try:
         """
 
         def decorator(f):
-            f_name = f.__module__ + '.' + f.__name__
-            c_key = join(':', [prefix, 'fc', f_name, '#pid'])
+            f_name = f.__module__ + "." + f.__name__
+            c_key = join(":", [prefix, "fc", f_name, "#pid"])
             key_gen = compose(
-                replace('#pid', _, c_key),
+                replace("#pid", _, c_key),
                 default_to(os.getpid()),
-                hexdigest('md5'),
-                to_json
+                hexdigest("md5"),
+                to_json,
             )
 
             @wraps(f)
             async def redis_cache_f(*args, update_cache: bool = False, **kwargs):
                 client = redis_connector() if redis_connector else redis.connect()
-                cache_key = key_gen({'args': args, 'kwargs': kwargs})
+                cache_key = key_gen({"args": args, "kwargs": kwargs})
 
                 if not update_cache and await client.exists(cache_key):
                     try:
@@ -126,36 +125,53 @@ try:
                 while asyncio.iscoroutine(r):
                     r = await r
                 if r is not None:
-                    expires_seconds = int(expires.total_seconds()) if isinstance(expires, timedelta) else expires
+                    expires_seconds = (
+                        int(expires.total_seconds())
+                        if isinstance(expires, timedelta)
+                        else expires
+                    )
                     await client.set(cache_key, _obj_encode(r), ex=expires_seconds)
                 return r
 
             if asyncio.iscoroutinefunction(f):
+
                 @wraps(f)
                 async def async_cache_f(*args, update_cache: bool = False, **kwargs):
-                    return await redis_cache_f(*args, update_cache=update_cache, **kwargs)
+                    return await redis_cache_f(
+                        *args, update_cache=update_cache, **kwargs
+                    )
+
                 return async_cache_f
 
             @wraps(f)
             def sync_wrapper(*args, update_cache: bool = False, **kwargs):
-                return asyncio.run(redis_cache_f(*args, update_cache=update_cache, **kwargs))
+                return asyncio.run(
+                    redis_cache_f(*args, update_cache=update_cache, **kwargs)
+                )
 
             return sync_wrapper
 
         return decorator
-except ModuleNotFoundError:
-    warnings.warn('redis is not installed, [redis_cache] is not cached!!')
 
-    def redis_cache(expires=DEFAULT_CACHE_TIME, prefix=None, redis_connector=None, result_assert=None):
+except ModuleNotFoundError:
+    warnings.warn("redis is not installed, [redis_cache] is not cached!!")
+
+    def redis_cache(
+        expires=DEFAULT_CACHE_TIME,
+        prefix=None,
+        redis_connector=None,
+        result_assert=None,
+    ):
         def decorator(f):
             return f
+
         return decorator
 
 
 def _save_data(fs: Writable, tmp_file: Path, data):
     try:
         dump(data, tmp_file)
-        with tmp_file.open('rb') as ft:
+        with tmp_file.open("rb") as ft:
             fs.write(ft)
     except FileExistsError:
         pass
@@ -172,13 +188,19 @@ def persistence(fs: Union[Writable, Callable[[], Writable]], f):
     :return:
     :python_version: >= 3.8
     """
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         r = f(*args, **kwargs)
         if r is not None:
-            save_opts = (identity(fs), Path(os.path.join(CACHE_DEFAULT_DIR, uuid4().hex)), r)
-            asyncio.get_event_loop().run_in_executor(None, copy_context().run, partial(_save_data, *save_opts))
+            save_opts = (
+                identity(fs),
+                Path(os.path.join(CACHE_DEFAULT_DIR, uuid4().hex)),
+                r,
+            )
+            asyncio.get_event_loop().run_in_executor(
+                None, copy_context().run, partial(_save_data, *save_opts)
+            )
         return r
 
     return wrapper
-

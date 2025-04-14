@@ -22,24 +22,35 @@ from .jsonfy import (
 from .pdtools import TYPE_REGS, col_value, df_dt, df_to_dict, df_to_json, ser_to_json
 
 __all__ = (
-    'SafeJsonEncoder', 'SafeJsonDecoder', 'to_json', 'to_json_file',
-    'pp_json', 'fix_document', 'to_obj', 'from_json_file',
-    'col_value', 'df_dt', 'df_to_json', 'ser_to_json', 'df_to_dict', 'TYPE_REGS',
-    'host_mac',
-    'hmac_sha256',
-    'uri_encode',
-    'uri_decode',
-    'nl_print',
-    'c_write',
-    'clear',
-    'async_run',
-    'load_fc',
-    'obj_dumps',
-    'obj_loads',
-    'init_event_loop',
-    'get_running_loop',
-    'map_async',
-    'utcnow',
+    "SafeJsonEncoder",
+    "SafeJsonDecoder",
+    "to_json",
+    "to_json_file",
+    "pp_json",
+    "fix_document",
+    "to_obj",
+    "from_json_file",
+    "col_value",
+    "df_dt",
+    "df_to_json",
+    "ser_to_json",
+    "df_to_dict",
+    "TYPE_REGS",
+    "host_mac",
+    "hmac_sha256",
+    "uri_encode",
+    "uri_decode",
+    "nl_print",
+    "c_write",
+    "clear",
+    "async_run",
+    "load_fc",
+    "obj_dumps",
+    "obj_loads",
+    "init_event_loop",
+    "get_running_loop",
+    "map_async",
+    "utcnow",
 )
 
 
@@ -82,12 +93,13 @@ def get_running_loop():
 
 def host_mac():
     import uuid
+
     return hex(uuid.getnode())[2:].upper()
 
 
 @curry
 def hmac_sha256(key, s):
-    cipher = hmac.new(key, s, digestmod='SHA256')
+    cipher = hmac.new(key, s, digestmod="SHA256")
     return base64.b64encode(cipher.digest())
 
 
@@ -96,9 +108,9 @@ uri_decode = compose(decode, base64.urlsafe_b64decode)
 
 
 # console cmd
-nl_print = partial(print, end='\n\n')  # 多空一行的输出
-c_write = partial(print, flush=False, end='')  # 不立刻输出的print
-clear = partial(os.system, 'clear')
+nl_print = partial(print, end="\n\n")  # 多空一行的输出
+c_write = partial(print, flush=False, end="")  # 不立刻输出的print
+clear = partial(os.system, "clear")
 
 
 # async run
@@ -139,12 +151,12 @@ async def async_run(sync_func, *args, with_context=False, **kwargs):
 
 def load_fc(fc_name, module_name=None):
     package = None
-    if ':' in fc_name:
+    if ":" in fc_name:
         package = module_name
-        module_name, fc_name = fc_name.rsplit(':', 1)
-    assert module_name, 'module_name is not empty'
-    if package and not module_name.startswith('.'):
-        module_name = '.' + module_name
+        module_name, fc_name = fc_name.rsplit(":", 1)
+    assert module_name, "module_name is not empty"
+    if package and not module_name.startswith("."):
+        module_name = "." + module_name
     w = import_module(module_name, package=package)
     return getattr(w, fc_name) if has_attr(fc_name)(w) else None
 
@@ -152,17 +164,19 @@ def load_fc(fc_name, module_name=None):
 def obj_dumps(obj):
     from base64 import b64encode
     from pickle import dumps
+
     return b64encode(dumps(obj))
 
 
 def obj_loads(raw):
     import base64
     import pickle
+
     return pickle.loads(base64.b64decode(raw))
 
 
 def _splitor(data, start, limit):
-    return data[start:start+limit]
+    return data[start : start + limit]
 
 
 def map_async(func, data, limit=None, splitor=_splitor):
@@ -178,7 +192,9 @@ def map_async(func, data, limit=None, splitor=_splitor):
     block = splitor(data, start, limit)
     with ThreadPoolExecutor() as pool:
         while len(block) > 0:
-            tasks.append(loop.run_in_executor(pool, lambda d: [func(x) for x in d], block))
+            tasks.append(
+                loop.run_in_executor(pool, lambda d: [func(x) for x in d], block)
+            )
             start += limit
             block = splitor(data, start, limit)
 
@@ -188,5 +204,5 @@ def map_async(func, data, limit=None, splitor=_splitor):
 
 def utcnow():
     from datetime import datetime, timezone
-    return datetime.now(timezone.utc)
 
+    return datetime.now(timezone.utc)

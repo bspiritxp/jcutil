@@ -66,5 +66,5 @@ indent-style = "space"
 line-ending = "auto"
 
 # 导入设置
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["jcutil"]

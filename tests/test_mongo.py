@@ -87,7 +87,7 @@ async def test_proxy(client):
 
     try:
         # 测试异步代理
-        async_proxy = await client.create_async_proxy(TEST_COLLECTION)
+        async_proxy = client.create_async_proxy(TEST_COLLECTION)
         async_data = {"name": "async_proxy_test", "value": 600}
         async_added = await async_proxy.add(async_data)
         assert async_added["name"] == "async_proxy_test"

@@ -9,19 +9,37 @@ from jcramda import first, join, partial, zip_
 from jcutil.core import c_write, nl_print
 
 __all__ = (
-    'Color', 'FontFormat', 'Chalk', 'EndFlag', 'RedChalk', 'GreenChalk', 'BlackChalk',
-    'BlueChalk', 'MagentaChalk', 'WhiteChalk', 'YellowChalk', 'CyanChalk',
-    'show_menu', 'select', 'BoldChalk',
-    'BrightRedChalk', 'BrightBlueChalk', 'BrightCyanChalk', 'BrightBlackChalk', 'BrightGreenChalk',
-    'BrightWhiteChalk', 'BrightYellowChalk', 'BrightMagentaChalk',
+    "Color",
+    "FontFormat",
+    "Chalk",
+    "EndFlag",
+    "RedChalk",
+    "GreenChalk",
+    "BlackChalk",
+    "BlueChalk",
+    "MagentaChalk",
+    "WhiteChalk",
+    "YellowChalk",
+    "CyanChalk",
+    "show_menu",
+    "select",
+    "BoldChalk",
+    "BrightRedChalk",
+    "BrightBlueChalk",
+    "BrightCyanChalk",
+    "BrightBlackChalk",
+    "BrightGreenChalk",
+    "BrightWhiteChalk",
+    "BrightYellowChalk",
+    "BrightMagentaChalk",
 )
 
 
-__CHALK_TMPL__ = '\033[{}m'
-__RESET__ = '\033[0m'
+__CHALK_TMPL__ = "\033[{}m"
+__RESET__ = "\033[0m"
 
 # 在Windows系统上初始化colorama
-if os.name == 'nt':
+if os.name == "nt":
     init(convert=True, strip=False)
 
 
@@ -75,7 +93,9 @@ class EndFlag(IntEnum):
     D_END = 29
 
 
-def _gen_raw(fgc: Optional[Color] = None, bgc: Optional[Color] = None, *styles: FontFormat) -> str:
+def _gen_raw(
+    fgc: Optional[Color] = None, bgc: Optional[Color] = None, *styles: FontFormat
+) -> str:
     """生成ANSI转义序列
 
     Args:
@@ -87,25 +107,32 @@ def _gen_raw(fgc: Optional[Color] = None, bgc: Optional[Color] = None, *styles: 
         ANSI转义序列字符串
     """
     # 过滤None值，确保join函数收到的是有效值
-    raw = [value for value in (
-        fgc.value if fgc else None,
-        bgc.bgcolor if bgc else None,
-        *[ff.value for ff in styles if ff is not None]
-    ) if value is not None]
+    raw = [
+        value
+        for value in (
+            fgc.value if fgc else None,
+            bgc.bgcolor if bgc else None,
+            *[ff.value for ff in styles if ff is not None],
+        )
+        if value is not None
+    ]
 
     if not raw:
         return __RESET__
 
-    return __CHALK_TMPL__.format(join(';')(raw))
+    return __CHALK_TMPL__.format(join(";")(raw))
 
 
 class Chalk:
     """控制台彩色文本工具类"""
 
-    def __init__(self, text: Optional[str] = None,
-                 fgc: Optional[Color] = None,
-                 bgc: Optional[Color] = None,
-                 styles: Tuple[FontFormat, ...] = ()):
+    def __init__(
+        self,
+        text: Optional[str] = None,
+        fgc: Optional[Color] = None,
+        bgc: Optional[Color] = None,
+        styles: Tuple[FontFormat, ...] = (),
+    ):
         """初始化Chalk实例
 
         Args:
@@ -119,7 +146,7 @@ class Chalk:
         if text:
             self.text(text)
 
-    def use(self, *args: FontFormat, **kwargs) -> 'Chalk':
+    def use(self, *args: FontFormat, **kwargs) -> "Chalk":
         """使用指定样式
 
         Args:
@@ -131,11 +158,12 @@ class Chalk:
         Returns:
             Chalk实例
         """
-        self.__chains__.append(_gen_raw(
-            kwargs.get('fg_color'), kwargs.get('bg_color'), *args))
+        self.__chains__.append(
+            _gen_raw(kwargs.get("fg_color"), kwargs.get("bg_color"), *args)
+        )
         return self
 
-    def end(self, *flag: EndFlag) -> 'Chalk':
+    def end(self, *flag: EndFlag) -> "Chalk":
         """结束当前样式
 
         Args:
@@ -161,9 +189,9 @@ class Chalk:
         """
         if not text:
             return ""
-        return str(text).replace(__RESET__, first(self.__chains__) or '')
+        return str(text).replace(__RESET__, first(self.__chains__) or "")
 
-    def text(self, text: str) -> 'Chalk':
+    def text(self, text: str) -> "Chalk":
         """添加文本
 
         Args:
@@ -184,7 +212,7 @@ class Chalk:
         """
         self.use(*style).text(text).end(EndFlag.ALL_END)
 
-    def bold(self, text: str) -> 'Chalk':
+    def bold(self, text: str) -> "Chalk":
         """添加粗体文本
 
         Args:
@@ -196,7 +224,7 @@ class Chalk:
         self.use(FontFormat.BOLD).text(text)
         return self
 
-    def italic(self, text: str) -> 'Chalk':
+    def italic(self, text: str) -> "Chalk":
         """添加斜体文本
 
         Args:
@@ -208,7 +236,7 @@ class Chalk:
         self.use(FontFormat.ITALIC).text(text)
         return self
 
-    def underline(self, text: str) -> 'Chalk':
+    def underline(self, text: str) -> "Chalk":
         """添加下划线文本
 
         Args:
@@ -235,7 +263,7 @@ class Chalk:
         Returns:
             原始文本
         """
-        return ''.join(self.__buffer__)
+        return "".join(self.__buffer__)
 
     def __str__(self) -> str:
         """获取完整的彩色文本
@@ -244,8 +272,8 @@ class Chalk:
             带有ANSI控制序列的文本
         """
         # 使用zip_来配对chains和buffer
-        data = zip_('', self.__chains__, self.__buffer__)
-        return ''.join([f'{c}{t}' for c, t in data]) + __RESET__
+        data = zip_("", self.__chains__, self.__buffer__)
+        return "".join([f"{c}{t}" for c, t in data]) + __RESET__
 
     def __len__(self) -> int:
         """获取文本长度
@@ -255,7 +283,7 @@ class Chalk:
         """
         return len(self.raw)
 
-    def __add__(self, other: Union[str, 'Chalk']) -> Union[str, 'Chalk']:
+    def __add__(self, other: Union[str, "Chalk"]) -> Union[str, "Chalk"]:
         """连接两个Chalk对象或Chalk与字符串
 
         Args:
@@ -269,7 +297,7 @@ class Chalk:
 
         new_chalk = Chalk()
         new_chalk.__chains__ = self.__chains__ + [__RESET__] + other.__chains__
-        new_chalk.__buffer__ = self.__buffer__ + [''] + other.__buffer__
+        new_chalk.__buffer__ = self.__buffer__ + [""] + other.__buffer__
         return new_chalk
 
     def __radd__(self, other: str) -> str:
@@ -291,7 +319,7 @@ class Chalk:
         Returns:
             对象的调试表示
         """
-        return f'Chalk<buff:{self.__buffer__}, chain:{self.__chains__}>'
+        return f"Chalk<buff:{self.__buffer__}, chain:{self.__chains__}>"
 
     def __call__(self, *args, **kwargs) -> str:
         """调用对象时返回字符串表示
@@ -334,7 +362,9 @@ BrightYellowChalk = partial(Chalk, fgc=Color.BRIGHT_YELLOW)
 BrightWhiteChalk = partial(Chalk, fgc=Color.BRIGHT_WHITE)
 
 
-def show_menu(items: List[tuple], is_submenu: bool = False, title: Union[str, Chalk] = '命令菜单') -> Any:
+def show_menu(
+    items: List[tuple], is_submenu: bool = False, title: Union[str, Chalk] = "命令菜单"
+) -> Any:
     """显示菜单并获取用户选择
 
     Args:
@@ -353,22 +383,23 @@ def show_menu(items: List[tuple], is_submenu: bool = False, title: Union[str, Ch
 
     # 显示标题
     if isinstance(title, Chalk):
-        c_write(title, end='\n\n')
+        c_write(title, end="\n\n")
     else:
-        c_write(GreenChalk(title, styles=(FontFormat.BOLD,)), end='\n\n')
+        c_write(GreenChalk(title, styles=(FontFormat.BOLD,)), end="\n\n")
 
     # 添加返回和退出选项
     if is_submenu:
-        items_copy.append(('返回', lambda: ''))
-    items_copy.append(('退出', sys.exit))
+        items_copy.append(("返回", lambda: ""))
+    items_copy.append(("退出", sys.exit))
 
     # 显示菜单项
     for item_title, _ in items_copy:
         sys.stdout.write(
-            YellowChalk(f'{index}. {item_title}', styles=(FontFormat.BOLD,))() + '\n')
+            YellowChalk(f"{index}. {item_title}", styles=(FontFormat.BOLD,))() + "\n"
+        )
         index += 1
 
-    nl_print('\n')
+    nl_print("\n")
 
     # 获取用户选择并执行
     try:
@@ -389,7 +420,7 @@ def select() -> int:
     Returns:
         用户选择的数字
     """
-    c_write(GreenChalk('选择功能：')())
+    c_write(GreenChalk("选择功能：")())
     sys.stdout.flush()
     try:
         # 支持更大的菜单项数量

@@ -5,8 +5,7 @@ import pandas as pd
 from jcutil.drivers import db
 
 
-def quick_update(schema, target: str, set_cols, where_cols, data, /,
-                 mode='update'):
+def quick_update(schema, target: str, set_cols, where_cols, data, /, mode="update"):
     """利用pandas快速生成的临时表来批量更新数据
 
     **使用RPLACE模式需要注意，如果传入的数据字段少于原有字段，则原表中的这些字段将被至为NULL**
@@ -22,36 +21,37 @@ def quick_update(schema, target: str, set_cols, where_cols, data, /,
     Exceptions:
         ValueError: some column in set_cols or where_cols which is not in target table.
     """
-    temp_name = f'tmp_{int(time.time())}'
+    temp_name = f"tmp_{int(time.time())}"
     if isinstance(where_cols, (str, bytes)):
-        where_cols = where_cols.split(',')
+        where_cols = where_cols.split(",")
     if isinstance(set_cols, (str, bytes)):
-        set_cols = set_cols.split(',')
-    target_columns = set(pd.read_sql(f'describe {target}', db.conn(schema)).Field.values)
+        set_cols = set_cols.split(",")
+    target_columns = set(
+        pd.read_sql(f"describe {target}", db.conn(schema)).Field.values
+    )
     df = pd.DataFrame(data)
     if diff := (set(set_cols) - target_columns):
-        raise ValueError(f'set_cols: {diff} columns not in target table.')
+        raise ValueError(f"set_cols: {diff} columns not in target table.")
     if diff := (set(where_cols) - target_columns):
-        raise ValueError(f'where_cols: {diff} columns not in target table.')
+        raise ValueError(f"where_cols: {diff} columns not in target table.")
     cols = [col for col in df.columns if col in target_columns]
 
     if df.empty or not cols:
         return
-    if mode == 'update':
-        sql = 'UPDATE {target} t, {source} s SET {sets} WHERE {where}'.format(
+    if mode == "update":
+        sql = "UPDATE {target} t, {source} s SET {sets} WHERE {where}".format(
             target=target,
             source=temp_name,
-            sets=','.join([f't.{c} = s.{c}' for c in set_cols]),
-            where=' AND '.join([f't.{c} = s.{c}' for c in where_cols]),
+            sets=",".join([f"t.{c} = s.{c}" for c in set_cols]),
+            where=" AND ".join([f"t.{c} = s.{c}" for c in where_cols]),
         )
     else:
-        sql = 'REPLACE INTO {target} ({sets}) SELECT {sets} FROM {source}'.format(
-            target=target, source=temp_name,
-            sets=','.join(cols)
+        sql = "REPLACE INTO {target} ({sets}) SELECT {sets} FROM {source}".format(
+            target=target, source=temp_name, sets=",".join(cols)
         )
     with db.conn(schema).begin() as session:
-        session.execute(f'create table {temp_name} like {target}')
-        df[cols].to_sql(temp_name, session, index=False, if_exists='append')
+        session.execute(f"create table {temp_name} like {target}")
+        df[cols].to_sql(temp_name, session, index=False, if_exists="append")
         session.execute(sql)
-        session.execute(f'drop table {temp_name}')
+        session.execute(f"drop table {temp_name}")
         session.commit()

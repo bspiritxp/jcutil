@@ -1,7 +1,3 @@
-from .config import __all__ as config_all
-from .envars import __all__ as envars_all
-
-__all__ = [
-    *config_all,
-    *envars_all,
-]
+"""
+server 模块提供一些用于服务端开发的实用函数和类
+"""

@@ -13,22 +13,22 @@ def _hcl_load(raw_value):
 
 
 __all__ = (
-    'Consul',
-    'ConsulClient',
-    'path_join',
-    'fetch_key',
-    'register_service',
-    'deregister',
-    'get_services',
-    'find_service',
-    'register_check',
-    'deregister_check',
-    'create_session',
-    'destroy_session',
-    'renew_session',
-    'acquire_lock',
-    'release_lock',
-    'list_keys',
+    "Consul",
+    "ConsulClient",
+    "path_join",
+    "fetch_key",
+    "register_service",
+    "deregister",
+    "get_services",
+    "find_service",
+    "register_check",
+    "deregister_check",
+    "create_session",
+    "destroy_session",
+    "renew_session",
+    "acquire_lock",
+    "release_lock",
+    "list_keys",
 )
 
 Consul = py_consul.Consul
@@ -37,7 +37,16 @@ Consul = py_consul.Consul
 class ConsulClient:
     """Consul客户端，提供同步API封装"""
 
-    def __init__(self, host='127.0.0.1', port=8500, token=None, scheme='http', consistency='default', dc=None, verify=True):
+    def __init__(
+        self,
+        host=None,
+        port=8500,
+        token=None,
+        scheme="http",
+        consistency="default",
+        dc=None,
+        verify=True,
+    ):
         """初始化Consul客户端
 
         Args:
@@ -49,16 +58,19 @@ class ConsulClient:
             dc: 数据中心
             verify: SSL验证
         """
-        self.params = {
-            'host': host,
-            'port': port,
-            'token': token,
-            'scheme': scheme,
-            'consistency': consistency,
-            'dc': dc,
-            'verify': verify
-        }
-        self._client = Consul(**self.params)
+        if host is None:
+            self._client = Consul()
+        else:
+            self.params = {
+                "host": host,
+                "port": port,
+                "token": token,
+                "scheme": scheme,
+                "consistency": consistency,
+                "dc": dc,
+                "verify": verify,
+            }
+            self._client = Consul(**self.params)
 
     @property
     def client(self) -> py_consul.Consul:
@@ -175,7 +187,7 @@ _default_client = ConsulClient()
 
 
 def path_join(*args):
-    return '/'.join(args)
+    return "/".join(args)
 
 
 def _yaml_load(raw_value):
@@ -184,6 +196,7 @@ def _yaml_load(raw_value):
 
 def _json_load(raw_value):
     import json
+
     return json.loads(raw_value)
 
 
@@ -197,7 +210,9 @@ class ConfigFormat(Enum):
     Hcl = _hcl_load
 
 
-def fetch_key(key_path, fmt: Callable = None, client: Optional[ConsulClient] = None) -> Any:
+def fetch_key(
+    key_path, fmt: Callable = None, client: Optional[ConsulClient] = None
+) -> Any:
     """获取配置键值
 
     Args:
@@ -210,9 +225,9 @@ def fetch_key(key_path, fmt: Callable = None, client: Optional[ConsulClient] = N
     """
     client = client or _default_client
     __, raw = client.kv_get(key_path)
-    assert raw, f'not found any content in {key_path}'
+    assert raw, f"not found any content in {key_path}"
     # noinspection PyCallingNonCallable
-    values = raw.get('Value')
+    values = raw.get("Value")
     return fmt(values) if callable(fmt) else values.decode()
 
 
@@ -251,7 +266,9 @@ def get_services(client: Optional[ConsulClient] = None) -> Dict:
     return client.services()
 
 
-def find_service(query: str, by_id: bool = False, client: Optional[ConsulClient] = None) -> Dict:
+def find_service(
+    query: str, by_id: bool = False, client: Optional[ConsulClient] = None
+) -> Dict:
     """按名称或ID查找服务
 
     Args:
@@ -270,7 +287,7 @@ def find_service(query: str, by_id: bool = False, client: Optional[ConsulClient]
         return {k: v for k, v in services.items() if k == query}
     else:
         # 按服务名称查找
-        return {k: v for k, v in services.items() if v.get('Service') == query}
+        return {k: v for k, v in services.items() if v.get("Service") == query}
 
 
 def register_check(name: str, check: Dict, **kwargs) -> None:
@@ -296,7 +313,7 @@ def deregister_check(check_id: str) -> None:
     _default_client.check_deregister(check_id)
 
 
-def create_session(name: str = None, ttl: str = '30s', **kwargs) -> str:
+def create_session(name: str = None, ttl: str = "30s", **kwargs) -> str:
     """创建Consul会话
 
     Args:
@@ -381,7 +398,7 @@ class KvProperty:
 
     def __init__(self, key, /, prefix=None, namespace=None, format=None, cached=None):
         self.key = key
-        self._prefix = '/'.join(filter(None, (namespace or 'properties', prefix)))
+        self._prefix = "/".join(filter(None, (namespace or "properties", prefix)))
         self._fmt = format or ConfigFormat.Text
         self._cached = cached
 
@@ -395,7 +412,11 @@ class KvProperty:
         else:
             name = self.key
             func = identity
-        value = func(fetch_key('/'.join([self._prefix, instance.__class__.__name__, name]), self._fmt))
+        value = func(
+            fetch_key(
+                "/".join([self._prefix, instance.__class__.__name__, name]), self._fmt
+            )
+        )
         if self._cached:
             setattr(instance, name, value)
         return value

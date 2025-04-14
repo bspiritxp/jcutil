@@ -8,8 +8,11 @@ from functools import wraps
 from typing import Any, Optional, Protocol, Union
 from uuid import uuid4
 
+from jcramda import first
 from redis.asyncio import Redis
 from redis.asyncio.cluster import RedisCluster
+
+from jcutil.core import get_running_loop
 
 __clients = {}
 
@@ -27,27 +30,57 @@ async def new_client(uri: str, tag: str = None):
     if tag is None:
         tag = uuid4()
 
-    if uri.startswith('cluster'):
+    if uri.startswith("cluster"):
         __clients[tag] = RedisCluster.from_url(uri)
     else:
         __clients[tag] = Redis.from_url(uri)
 
 
-def connect(tag: Union[str, int] = 0) -> RedisClientP:
+def get_client(tag: Union[str, int] = None) -> RedisClientP:
+    """
+    获取redis客户端
+    """
+    if tag is None:
+        tag = first(list(__clients.keys()))
     pool = __clients.get(tag, None)
     if pool:
         return pool
-    raise RuntimeWarning(f'Not found redis client with name: {tag}')
+    raise RuntimeWarning(f"Not found redis client with name: {tag}")
 
 
-async def load(conf: dict):
+def load(conf: dict):
+    """
+    一次性读取配置文件，生成redis链接
+    配置文件格式：dict(redis_uri="{redis_uri}")
+    ```
+    {
+      "redis1": "redis://localhost:6379",
+    }
+    """
     if conf and len(conf) > 0:
-        for key in conf:
-            await new_client(conf[key], key)
+        try:
+            # 检查是否在异步环境中运行
+            loop = asyncio.get_running_loop()
+
+            # 已经在异步环境中，直接创建任务
+            async def _load_clients():
+                tasks = []
+                for key in conf:
+                    tasks.append(new_client(conf[key], key))
+                await asyncio.gather(*tasks)
+
+            # 在已有异步环境中，返回协程给调用者处理
+            return _load_clients()
+        except RuntimeError:
+            # 不在异步环境中，创建新的事件循环
+            loop = get_running_loop()
+            tasks = [loop.create_task(new_client(conf[key], key)) for key in conf]
+            loop.run_until_complete(asyncio.gather(*tasks))
+
             # print(f'redis: {key} connected')
 
 
-conn = get_client = connect
+connect = conn = get_client
 
 
 class Lock:
@@ -92,7 +125,7 @@ class SpinLock(Lock):
     async def __aenter__(self):
         r = await self.acquire(self._blocking, self._timeout)
         if not r:
-            raise RuntimeError(f'Cannot acquire lock: {self._flg}')
+            raise RuntimeError(f"Cannot acquire lock: {self._flg}")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -110,10 +143,11 @@ def interval_lock(flg, name, timeout=timedelta(seconds=3)):
             client = connect(flg)
             time_limit = int(timeout.total_seconds())
             if await client.exists(name):
-                raise IntervalLimitError(
-                    f'time interval limit in {time_limit}s')
+                raise IntervalLimitError(f"time interval limit in {time_limit}s")
             await client.setnx(name, time.time())
             await client.expire(name, time_limit)
             return await fn(*args, **kwargs)
+
         return wrapped
+
     return limit_ann

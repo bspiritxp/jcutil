@@ -24,32 +24,32 @@ from jcramda import (
 from .pdtools import TYPE_REGS
 
 _str_to_type = {
-    'true': True,
-    'false': False,
+    "true": True,
+    "false": False,
 }
 
 __all__ = (
-    'SafeJsonEncoder',
-    'SafeJsonDecoder',
-    'to_json',
-    'to_json_file',
-    'pp_json',
-    'fix_document',
-    'to_obj',
-    'from_json_file',
+    "SafeJsonEncoder",
+    "SafeJsonDecoder",
+    "to_json",
+    "to_json_file",
+    "pp_json",
+    "fix_document",
+    "to_obj",
+    "from_json_file",
 )
 
 
 _type_regs = (
     *TYPE_REGS,
-    (is_a((UUID, )), str),
-    (is_a(dt.datetime), lambda o: o.strftime('%Y-%m-%d %H:%M:%S')),
+    (is_a((UUID,)), str),
+    (is_a(dt.datetime), lambda o: o.strftime("%Y-%m-%d %H:%M:%S")),
     (is_a(bytes), b64_encode),
     (is_a(memoryview), compose(b64_encode, bytes)),
     (is_a(dict), flat_concat),
     (is_a_int, int),
-    (has_attr('__html__'), compose(identity, attr('__html__'))),
-    (is_a(str), lambda s: _str_to_type.get(s, s))
+    (has_attr("__html__"), compose(identity, attr("__html__"))),
+    (is_a(str), lambda s: _str_to_type.get(s, s)),
 )
 
 
@@ -67,6 +67,7 @@ class SafeJsonDecoder(JSONDecoder):
 
 to_json = partial(dumps, cls=SafeJsonEncoder, ensure_ascii=False)
 
+
 def to_json_file(obj, fp, **kwargs):
     """将对象序列化为JSON并写入文件
 
@@ -75,17 +76,17 @@ def to_json_file(obj, fp, **kwargs):
         fp: 文件路径或文件对象
         **kwargs: 其他传递给json.dump的参数
     """
-    kwargs.setdefault('cls', SafeJsonEncoder)
-    kwargs.setdefault('ensure_ascii', False)
+    kwargs.setdefault("cls", SafeJsonEncoder)
+    kwargs.setdefault("ensure_ascii", False)
 
     if isinstance(fp, str):
-        with open(fp, 'w', encoding='utf-8') as f:
+        with open(fp, "w", encoding="utf-8") as f:
             dump(obj, f, **kwargs)
     else:
         dump(obj, fp, **kwargs)
 
 
-DocFixedOpt = namedtuple('DocFixedOpt', 'where, fixed')
+DocFixedOpt = namedtuple("DocFixedOpt", "where, fixed")
 
 
 def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
@@ -93,7 +94,7 @@ def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
         r = {}
         for k, v in doc.items():
             new_key, new_v = k, v
-            if str(k).startswith('$'):
+            if str(k).startswith("$"):
                 if len(doc) == 1:
                     return fix_document(v, fix_options)
                 new_key = k[1:]
@@ -102,21 +103,17 @@ def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
     elif is_a((list, tuple, set), doc):
         return [fix_document(x, fix_options) for x in doc]
 
-    if str(doc).lower() in ('nan', 'nat', 'null'):
+    if str(doc).lower() in ("nan", "nat", "null"):
         return None
 
-    return when(
-        *fix_options,
-        (is_a(Decimal), identity),
-        else_=doc
-    )(doc)
+    return when(*fix_options, (is_a(Decimal), identity), else_=doc)(doc)
 
 
 to_obj = partial(loads, cls=SafeJsonDecoder)
 
 
 def from_json_file(file_path):
-    with open(file_path, 'r') as fp:
+    with open(file_path, "r") as fp:
         s = load(fp, cls=SafeJsonDecoder)
     if is_a(str, s):
         s = to_obj(s)
@@ -127,9 +124,12 @@ def pp_json(obj):
     printed_str = dumps(obj, indent=2, ensure_ascii=False)
     try:
         from pygments import formatters, highlight, lexers
-        colorful_json = highlight(printed_str, lexers.JsonLexer(),
-                                formatters.TerminalFormatter())
+
+        colorful_json = highlight(
+            printed_str, lexers.JsonLexer(), formatters.TerminalFormatter()
+        )
     except ModuleNotFoundError:
         from jcutil.chalk import GreenChalk
+
         colorful_json = GreenChalk(printed_str)
     return colorful_json

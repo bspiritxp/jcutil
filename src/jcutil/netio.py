@@ -26,10 +26,10 @@ async def get_json(url, params, **kwargs):
     """
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params,
-                               headers={'content-type': 'application/json'},
-                               **kwargs) as resp:
-            if resp.content_type == 'application/json':
+        async with session.get(
+            url, params=params, headers={"content-type": "application/json"}, **kwargs
+        ) as resp:
+            if resp.content_type == "application/json":
                 return await resp.json()
             else:
                 return json.loads(await resp.text())
@@ -124,7 +124,7 @@ async def download(url, **kwargs):
             return BytesIO(await resp.content.read()), resp.content_type
 
 
-async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs):
+async def download_to_file(url, destination_path, chunk_size=1024 * 1024, **kwargs):
     """
     Download file from URL and save to disk with progress tracking
 
@@ -145,7 +145,7 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
         True if download was successful, False otherwise
     """
     dest_path = Path(destination_path)
-    if dest_path.exists() and not kwargs.get('overwrite', False):
+    if dest_path.exists() and not kwargs.get("overwrite", False):
         return False
 
     async with aiohttp.ClientSession() as session:
@@ -156,10 +156,10 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
             # Ensure directory exists
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-            int(resp.headers.get('Content-Length', 0))
+            int(resp.headers.get("Content-Length", 0))
             downloaded = 0
 
-            async with aiofiles.open(dest_path, 'wb') as f:
+            async with aiofiles.open(dest_path, "wb") as f:
                 async for chunk in resp.content.iter_chunked(chunk_size):
                     await f.write(chunk)
                     downloaded += len(chunk)
@@ -167,7 +167,9 @@ async def download_to_file(url, destination_path, chunk_size=1024*1024, **kwargs
             return True
 
 
-async def upload_file(url, file_path, field_name='file', additional_data=None, **kwargs):
+async def upload_file(
+    url, file_path, field_name="file", additional_data=None, **kwargs
+):
     """
     Upload file to server using multipart/form-data
 
@@ -194,10 +196,12 @@ async def upload_file(url, file_path, field_name='file', additional_data=None, *
         raise FileNotFoundError(f"File not found: {file_path}")
 
     data = aiohttp.FormData()
-    data.add_field(field_name,
-                   open(file_path, 'rb'),
-                   filename=file_path.name,
-                   content_type='application/octet-stream')
+    data.add_field(
+        field_name,
+        open(file_path, "rb"),
+        filename=file_path.name,
+        content_type="application/octet-stream",
+    )
 
     if additional_data:
         for key, value in additional_data.items():
@@ -208,7 +212,15 @@ async def upload_file(url, file_path, field_name='file', additional_data=None, *
             return await resp.json()
 
 
-async def upload_bytes(url, file_bytes, filename, field_name='file', content_type='application/octet-stream', additional_data=None, **kwargs):
+async def upload_bytes(
+    url,
+    file_bytes,
+    filename,
+    field_name="file",
+    content_type="application/octet-stream",
+    additional_data=None,
+    **kwargs,
+):
     """
     Upload in-memory bytes to server using multipart/form-data
 
@@ -239,10 +251,7 @@ async def upload_bytes(url, file_bytes, filename, field_name='file', content_typ
     if isinstance(file_bytes, BytesIO):
         file_bytes = file_bytes.getvalue()
 
-    data.add_field(field_name,
-                   file_bytes,
-                   filename=filename,
-                   content_type=content_type)
+    data.add_field(field_name, file_bytes, filename=filename, content_type=content_type)
 
     if additional_data:
         for key, value in additional_data.items():
@@ -273,7 +282,7 @@ class EventSourceClient:
         """
         self.url = url
         self.headers = headers or {}
-        self.headers.update({'Accept': 'text/event-stream'})
+        self.headers.update({"Accept": "text/event-stream"})
         self.reconnection_time = reconnection_time
         self._session = session
         self._should_close_session = session is None
@@ -306,42 +315,42 @@ class EventSourceClient:
 
     async def _process_events(self, response):
         """Process event stream from response"""
-        event_name = 'message'
+        event_name = "message"
         data = []
         last_id = None
 
         # Process the EventSource stream
         async for line in response.content:
-            line = line.decode('utf-8').strip()
+            line = line.decode("utf-8").strip()
 
             if not line:
                 # Empty line means dispatch the event
                 if data and event_name in self._event_callbacks:
-                    event_data = ''.join(data)
+                    event_data = "".join(data)
                     callback = self._event_callbacks[event_name]
                     await callback(event_data, last_id)
 
                 # Reset for next event
-                event_name = 'message'
+                event_name = "message"
                 data = []
                 continue
 
-            if line.startswith(':'):
+            if line.startswith(":"):
                 # Comment, ignore
                 continue
 
-            if ':' in line:
-                field, value = line.split(':', 1)
-                if value.startswith(' '):
+            if ":" in line:
+                field, value = line.split(":", 1)
+                if value.startswith(" "):
                     value = value[1:]
 
-                if field == 'event':
+                if field == "event":
                     event_name = value
-                elif field == 'data':
+                elif field == "data":
                     data.append(value)
-                elif field == 'id':
+                elif field == "id":
                     last_id = value
-                elif field == 'retry':
+                elif field == "retry":
                     try:
                         self.reconnection_time = int(value) / 1000.0
                     except ValueError:
@@ -359,9 +368,13 @@ class EventSourceClient:
 
         while self._running:
             try:
-                async with self._session.get(self.url, headers=self.headers) as response:
+                async with self._session.get(
+                    self.url, headers=self.headers
+                ) as response:
                     if response.status != 200:
-                        raise ConnectionError(f"Failed to connect to EventSource: {response.status}")
+                        raise ConnectionError(
+                            f"Failed to connect to EventSource: {response.status}"
+                        )
 
                     await self._process_events(response)
             except (aiohttp.ClientError, ConnectionError):
@@ -398,12 +411,7 @@ class WebSocketClient:
         self._session = session
         self._should_close_session = session is None
         self._ws = None
-        self._callbacks = {
-            'message': [],
-            'connect': [],
-            'disconnect': [],
-            'error': []
-        }
+        self._callbacks = {"message": [], "connect": [], "disconnect": [], "error": []}
 
     async def __aenter__(self):
         await self.connect()
@@ -443,9 +451,9 @@ class WebSocketClient:
 
         try:
             self._ws = await self._session.ws_connect(self.url, headers=self.headers)
-            await self._trigger_callbacks('connect')
+            await self._trigger_callbacks("connect")
         except Exception as e:
-            await self._trigger_callbacks('error', e)
+            await self._trigger_callbacks("error", e)
             raise
 
     async def send_text(self, message):
@@ -501,13 +509,13 @@ class WebSocketClient:
         msg = await self._ws.receive()
 
         if msg.type == aiohttp.WSMsgType.TEXT:
-            await self._trigger_callbacks('message', msg.data, 'text')
+            await self._trigger_callbacks("message", msg.data, "text")
         elif msg.type == aiohttp.WSMsgType.BINARY:
-            await self._trigger_callbacks('message', msg.data, 'binary')
+            await self._trigger_callbacks("message", msg.data, "binary")
         elif msg.type == aiohttp.WSMsgType.ERROR:
-            await self._trigger_callbacks('error', msg.data)
+            await self._trigger_callbacks("error", msg.data)
         elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING):
-            await self._trigger_callbacks('disconnect')
+            await self._trigger_callbacks("disconnect")
 
         return msg
 
@@ -521,16 +529,16 @@ class WebSocketClient:
         try:
             async for msg in self._ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    await self._trigger_callbacks('message', msg.data, 'text')
+                    await self._trigger_callbacks("message", msg.data, "text")
                 elif msg.type == aiohttp.WSMsgType.BINARY:
-                    await self._trigger_callbacks('message', msg.data, 'binary')
+                    await self._trigger_callbacks("message", msg.data, "binary")
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    await self._trigger_callbacks('error', msg.data)
+                    await self._trigger_callbacks("error", msg.data)
                     break
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING):
                     break
         finally:
-            await self._trigger_callbacks('disconnect')
+            await self._trigger_callbacks("disconnect")
 
     async def close(self):
         """Close WebSocket connection"""

@@ -7,6 +7,11 @@ from jcutil.server.envars import global_envars
 
 context = {}
 
+__all__ = [
+    "load_config",
+    "context",
+]
+
 
 def load_config(*args, config_path=global_envars.CONFIG_PATH, v=True):
     """
@@ -25,13 +30,14 @@ def load_config(*args, config_path=global_envars.CONFIG_PATH, v=True):
     conf = kv.fetch_key(config_path, fmt=kv.ConfigFormat.Yaml)
     if len(args) > 0:
         needed_conf = {}
-        for key in ['server', *args]:
-            assert key in conf, f'not found [{key}] in kv server.'
+        for key in ["server", *args]:
+            assert key in conf, f"not found [{key}] in kv server."
             needed_conf[key] = conf[key]
         conf = needed_conf
-    v and print(config_path, ':', chalk.GreenChalk(conf))
+    if v:
+        print(config_path, ":", chalk.GreenChalk(conf))
     try:
         smart_load(conf)
-        context['conf'] = conf
+        context["conf"] = conf
     except Exception as err:
-        logging.error('read config failed: %s', err)
+        logging.error("read config failed: %s", err)

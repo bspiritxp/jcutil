@@ -2,6 +2,7 @@
 A simple aes encrypt and decrypt module with cryptodome
 Support multiple encryption algorithms including AES, RSA, hash functions and more
 """
+
 # depend on pycryptodomex module
 import base64
 import binascii
@@ -25,6 +26,7 @@ DEFAULT_ITERATIONS = 10000  # 默认PBKDF2迭代次数
 
 class Mode(IntEnum):
     """AES加密模式"""
+
     EAX = AES.MODE_EAX
     ECB = AES.MODE_ECB
     CBC = AES.MODE_CBC
@@ -39,6 +41,7 @@ class Mode(IntEnum):
 
 class HashAlgorithm(IntEnum):
     """哈希算法类型"""
+
     MD5 = 0
     SHA1 = 1
     SHA256 = 2
@@ -62,12 +65,14 @@ def aes_encrypt(key, plain: str, /, mode=None) -> Tuple[str, str]:
     cipher = AES.new(key, enum_value(mode) or AES.MODE_EAX)
     # add padding to plaintext
     raw = pad(plain.encode(), BS)
-    if hasattr(cipher, 'encrypt_and_digest'):
+    if hasattr(cipher, "encrypt_and_digest"):
         ciphertext, tag = cipher.encrypt_and_digest(raw)
-        nonce_or_iv = getattr(cipher, 'nonce', tag if enum_value(mode) == AES.MODE_SIV else b'')
+        nonce_or_iv = getattr(
+            cipher, "nonce", tag if enum_value(mode) == AES.MODE_SIV else b""
+        )
     else:
         ciphertext = cipher.encrypt(raw)
-        nonce_or_iv = getattr(cipher, 'iv', getattr(cipher, 'nonce', b''))
+        nonce_or_iv = getattr(cipher, "iv", getattr(cipher, "nonce", b""))
     return tuple(it.hex().upper() for it in (ciphertext, nonce_or_iv))
 
 
@@ -89,12 +94,14 @@ def aes_decrypt(key, value: str, /, mode=None, nonce_or_iv: str = None) -> str:
     kws = {}
     if nonce_or_iv:
         if enum_value(mode) == AES.MODE_CTR:
-            kws['nonce'] = bytes.fromhex(nonce_or_iv)
+            kws["nonce"] = bytes.fromhex(nonce_or_iv)
         elif enum_value(mode) != AES.MODE_SIV:
             args.append(bytes.fromhex(nonce_or_iv))
     cryptor = AES.new(*args, **kws)
     if enum_value(mode) == AES.MODE_SIV:
-        ciphertext = cryptor.decrypt_and_verify(bytes.fromhex(value), bytes.fromhex(nonce_or_iv))
+        ciphertext = cryptor.decrypt_and_verify(
+            bytes.fromhex(value), bytes.fromhex(nonce_or_iv)
+        )
     else:
         ciphertext = cryptor.decrypt(bytes.fromhex(value))
     return unpad(ciphertext, BS).decode()
@@ -111,9 +118,7 @@ def get_sha1prng_key(key: str) -> str:
     Returns:
         生成的密钥（十六进制字符串）
     """
-    return hashlib.sha1(
-        hashlib.sha1(key.encode()).digest()
-    ).hexdigest().upper()[:32]
+    return hashlib.sha1(hashlib.sha1(key.encode()).digest()).hexdigest().upper()[:32]
 
 
 # 预定义的AES加密解密函数
@@ -128,7 +133,12 @@ aes_eax_decrypt = aes_decrypt(mode=AES.MODE_EAX)
 
 
 # PBKDF2密钥生成
-def pbkdf2_key(password: str, salt: Optional[bytes] = None, iterations: int = DEFAULT_ITERATIONS, key_length: int = 32) -> Tuple[bytes, bytes]:
+def pbkdf2_key(
+    password: str,
+    salt: Optional[bytes] = None,
+    iterations: int = DEFAULT_ITERATIONS,
+    key_length: int = 32,
+) -> Tuple[bytes, bytes]:
     """使用PBKDF2算法生成密钥
 
     Args:
@@ -142,7 +152,9 @@ def pbkdf2_key(password: str, salt: Optional[bytes] = None, iterations: int = DE
     """
     if salt is None:
         salt = get_random_bytes(16)
-    derived_key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, iterations, key_length)
+    derived_key = hashlib.pbkdf2_hmac(
+        "sha256", password.encode(), salt, iterations, key_length
+    )
     return derived_key, salt
 
 
@@ -169,7 +181,7 @@ def to_base64(data: Union[str, bytes]) -> str:
         Base64编码后的字符串
     """
     if isinstance(data, str):
-        if all(c in '0123456789ABCDEFabcdef' for c in data) and len(data) % 2 == 0:
+        if all(c in "0123456789ABCDEFabcdef" for c in data) and len(data) % 2 == 0:
             # 如果是十六进制字符串，先转换为字节
             data = bytes.fromhex(data)
         else:
@@ -199,7 +211,7 @@ def to_base64_url_safe(data: Union[str, bytes]) -> str:
         URL安全的Base64编码字符串
     """
     if isinstance(data, str):
-        if all(c in '0123456789ABCDEFabcdef' for c in data) and len(data) % 2 == 0:
+        if all(c in "0123456789ABCDEFabcdef" for c in data) and len(data) % 2 == 0:
             data = bytes.fromhex(data)
         else:
             data = data.encode()
@@ -327,10 +339,7 @@ def generate_rsa_key_pair(bits: int = 2048) -> Dict[str, bytes]:
     key = RSA.generate(bits)
     private_key = key.export_key()
     public_key = key.publickey().export_key()
-    return {
-        'private_key': private_key,
-        'public_key': public_key
-    }
+    return {"private_key": private_key, "public_key": public_key}
 
 
 def rsa_encrypt(public_key: Union[str, bytes], plain_data: Union[str, bytes]) -> str:
@@ -394,7 +403,9 @@ def rsa_sign(private_key: Union[str, bytes], data: Union[str, bytes]) -> str:
     return base64.b64encode(signature).decode()
 
 
-def rsa_verify(public_key: Union[str, bytes], data: Union[str, bytes], signature: str) -> bool:
+def rsa_verify(
+    public_key: Union[str, bytes], data: Union[str, bytes], signature: str
+) -> bool:
     """验证RSA签名
 
     Args:

@@ -49,19 +49,20 @@ class Envars:
 
 
 # 兼容旧版本
-global_envars = Envars()
-# 兼容旧版本的全局变量
-SCHEMA = global_envars.SCHEMA
-APP_ENV = global_envars.APP_ENV
-APP_DEBUG = global_envars.APP_DEBUG
-APP_PORT = global_envars.APP_PORT
-CLIENT_ID = global_envars.CLIENT_ID
-CLIENT_IP = global_envars.CLIENT_IP
-APP_NAME = global_envars.APP_NAME
-IS_WORKER = global_envars.IS_WORKER
-CONFIG_PATH = global_envars.CONFIG_PATH
-CACHE_PATH = global_envars.CACHE_PATH
-LOG_LEVEL = global_envars.LOG_LEVEL
+if "global_envars" not in globals():
+    global_envars = Envars()
+    # 兼容旧版本的全局变量
+    SCHEMA = global_envars.SCHEMA
+    APP_ENV = global_envars.APP_ENV
+    APP_DEBUG = global_envars.APP_DEBUG
+    APP_PORT = global_envars.APP_PORT
+    CLIENT_ID = global_envars.CLIENT_ID
+    CLIENT_IP = global_envars.CLIENT_IP
+    APP_NAME = global_envars.APP_NAME
+    IS_WORKER = global_envars.IS_WORKER
+    CONFIG_PATH = global_envars.CONFIG_PATH
+    CACHE_PATH = global_envars.CACHE_PATH
+    LOG_LEVEL = global_envars.LOG_LEVEL
 
 
 __all__ = (

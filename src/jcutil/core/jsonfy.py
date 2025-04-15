@@ -54,7 +54,6 @@ _type_regs = (
 
 
 class SafeJsonEncoder(JSONEncoder):
-
     def default(self, object_: Any) -> Any:
         r = when(*_type_regs, str)(object_)
         return key_map(camelcase, r)

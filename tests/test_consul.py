@@ -12,7 +12,13 @@ load_dotenv()
 @pytest.fixture
 def consul_client():
     """创建Consul客户端实例"""
-    return ConsulClient()
+    try:
+        client = ConsulClient()
+        # 测试连接是否有效
+        client.kv_get("test")
+        return client
+    except Exception as e:
+        pytest.skip(f"无法连接到Consul: {e}")
 
 
 class TestA:

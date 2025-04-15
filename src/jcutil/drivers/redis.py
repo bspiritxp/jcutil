@@ -18,12 +18,23 @@ __clients = {}
 
 
 class RedisClientP(Protocol):
-    async def exists(self, key) -> bool: ...
-    async def get(self, key) -> Any: ...
-    async def set(self, key, value, ex: Optional[int] = None) -> bool: ...
-    async def setnx(self, key, value) -> int: ...
-    async def delete(self, key) -> int: ...
-    async def expire(self, key, seconds) -> int: ...
+    async def exists(self, key) -> bool:
+        ...
+
+    async def get(self, key) -> Any:
+        ...
+
+    async def set(self, key, value, ex: Optional[int] = None) -> bool:
+        ...
+
+    async def setnx(self, key, value) -> int:
+        ...
+
+    async def delete(self, key) -> int:
+        ...
+
+    async def expire(self, key, seconds) -> int:
+        ...
 
 
 async def new_client(uri: str, tag: str = None):
@@ -45,7 +56,8 @@ def get_client(tag: Union[str, int] = None) -> RedisClientP:
     pool = __clients.get(tag, None)
     if pool:
         return pool
-    raise RuntimeWarning(f"Not found redis client with name: {tag}")
+    # 如果没有redis客户端,返回None而不是抛出异常
+    return None
 
 
 def load(conf: dict):

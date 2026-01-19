@@ -24,7 +24,6 @@ from jcramda import (
     join,
     replace,
 )
-from jcramda.core.operator import default_to
 from joblib import dump, memory
 
 from .core import to_json
@@ -70,7 +69,7 @@ def clear_mem(path: str = "", cache_dir: str = CACHE_DEFAULT_DIR):
 try:
     from .drivers import redis
 
-    def redis_cache(
+    def redis_cache(  # pyright: ignore [reportRedeclaration]
         expires=DEFAULT_CACHE_TIME,
         prefix=None,
         redis_connector=None,

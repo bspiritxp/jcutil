@@ -2,9 +2,10 @@ import os
 import sys
 from enum import IntEnum
 from typing import Any, List, Optional, Tuple, Union
+from functools import partial
 
 from colorama import init
-from jcramda import first, join, partial, zip_
+from jcramda import first, join, zip_
 
 from jcutil.core import c_write, nl_print
 

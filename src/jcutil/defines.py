@@ -39,5 +39,5 @@ else:
             ...
 
 
-CACHE_DEFAULT_DIR = os.getenv("TEMP") if platform.system() == "Windows" else "/tmp"
+CACHE_DEFAULT_DIR = os.getenv("TEMP", os.getcwd() + "/tmp") if platform.system() == "Windows" else "/tmp"
 DEFAULT_CACHE_TIME = timedelta(seconds=30)  # 30 seconds

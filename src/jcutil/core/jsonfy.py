@@ -1,10 +1,14 @@
+from _typeshed import SupportsWrite
 import datetime as dt
 from collections import namedtuple
 from decimal import Decimal
+from io import FileIO
 from json import JSONDecoder, JSONEncoder, dump, dumps, load, loads
-from typing import Any, Iterable
+from pathlib import Path
+from typing import Any, Iterable, override, Callable
 from uuid import UUID
 
+from functools import partial
 from jcramda import (
     attr,
     b64_encode,
@@ -17,7 +21,6 @@ from jcramda import (
     is_a_int,
     is_a_mapper,
     key_map,
-    partial,
     when,
 )
 
@@ -39,7 +42,6 @@ __all__ = (
     "from_json_file",
 )
 
-
 _type_regs = (
     *TYPE_REGS,
     (is_a((UUID,)), str),
@@ -48,15 +50,20 @@ _type_regs = (
     (is_a(memoryview), compose(b64_encode, bytes)),
     (is_a(dict), flat_concat),
     (is_a_int, int),
-    (has_attr("__html__"), compose(identity, attr("__html__"))),
+    (has_attr("__html__"), compose(identity, attr("__html__"))),  # pyright: ignore [reportCallIssue]
     (is_a(str), lambda s: _str_to_type.get(s, s)),
 )
 
-
 class SafeJsonEncoder(JSONEncoder):
-    def default(self, object_: Any) -> Any:
-        r = when(*_type_regs, str)(object_)
-        return key_map(camelcase, r)
+    @override
+    def default(self, o: Any) -> Any:
+        # 添加更具体的异常处理或返回None而不是强制转为字符串
+        try:
+            r = when(*_type_regs, else_=lambda x: None)(o)  # 或者抛出更明确的异常
+            return key_map(camelcase, r)  # pyright: ignore [reportArgumentType]
+        except Exception:
+            # 根据具体需求决定如何处理无法序列化的对象
+            raise TypeError(f"Object of type {type(o)} is not JSON serializable")
 
 
 class SafeJsonDecoder(JSONDecoder):
@@ -67,7 +74,7 @@ class SafeJsonDecoder(JSONDecoder):
 to_json = partial(dumps, cls=SafeJsonEncoder, ensure_ascii=False)
 
 
-def to_json_file(obj, fp, **kwargs):
+def to_json_file(obj: Any, fp: str|SupportsWrite[str], **kwargs: Any) -> None:
     """将对象序列化为JSON并写入文件
 
     Args:
@@ -88,7 +95,7 @@ def to_json_file(obj, fp, **kwargs):
 DocFixedOpt = namedtuple("DocFixedOpt", "where, fixed")
 
 
-def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
+def fix_document(doc: Any, fix_options: Iterable[DocFixedOpt] = ()) -> Any | None:
     if is_a_mapper(doc):
         r = {}
         for k, v in doc.items():
@@ -111,7 +118,7 @@ def fix_document(doc, fix_options: Iterable[DocFixedOpt] = ()):
 to_obj = partial(loads, cls=SafeJsonDecoder)
 
 
-def from_json_file(file_path):
+def from_json_file(file_path: str | Path) -> dict[str, Any] | list[Any]:
     with open(file_path, "r") as fp:
         s = load(fp, cls=SafeJsonDecoder)
     if is_a(str, s):
@@ -119,7 +126,7 @@ def from_json_file(file_path):
     return s
 
 
-def pp_json(obj):
+def pp_json(obj: object) -> str:
     printed_str = dumps(obj, indent=2, ensure_ascii=False)
     try:
         from pygments import formatters, highlight, lexers

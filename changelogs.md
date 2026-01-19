@@ -1,5 +1,28 @@
 # Change Logs
 
+## 2.1.0
+
+> 2026-01-19
+
+- 为数据库驱动模块添加类型标注
+  - 为 db.py 文件中的所有函数添加完整的类型注解
+  - 引入 Engine、AsyncEngine 等 SQLAlchemy 类型支持
+  - 添加适当的 Union 和 Optional 类型以提高代码可读性
+
+- 代码质量改进
+  - 为 jsonfy.py 模块添加类型标注和优化
+  - 更新 chalk 模块以符合类型检查标准
+  - 改进核心模块的类型安全性
+
+- 依赖和配置更新
+  - 更新 pyproject.toml 以反映新的依赖关系
+  - 更新 requirements.lock 和 uv.lock 以同步依赖版本
+
+- 数据访问层改进
+  - 重构 DBA 模块中的 SQL 相关功能
+  - 移除不再使用的 async_ 和 helper 模块
+  - 优化数据访问接口的一致性
+
 ## 2.0.1
 
 > 2025-04-13

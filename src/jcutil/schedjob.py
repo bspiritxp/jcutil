@@ -175,6 +175,6 @@ def default_store_opts(node=None) -> dict:
     mongo_client = mongo.conn()
     return {
         "collection": f"jobs.{node_id}",
-        "database": mongo_client.get_default_database().name,
+        "database": mongo_client.default_db_name,
         "client": mongo_client,
     }

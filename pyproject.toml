@@ -74,3 +74,6 @@ known-first-party = ["jcutil"]
 
 [tool.hatch.version]
 path = "src/jcutil/__init__.py"
+
+[tool.mypy]
+exclude = '.*\.pyi$'

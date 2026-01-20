@@ -2,7 +2,7 @@ from collections import namedtuple
 from decimal import Decimal
 from enum import Enum
 from functools import partial
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import motor.motor_asyncio
@@ -41,10 +41,10 @@ def fallback_encoder(value):
     return when(
         (is_a(Decimal), Decimal128),
         # (is_a(NDFrame), df_to_dict),
-        (is_a(InsertOneResult), compose(obj("insertedId"), attr("inserted_id"))),
-        (is_a(UpdateResult), compose(obj("upsertedId"), attr("upserted_id"))),
-        (has_attr("get"), lambda o: o.get()),
-        (has_attr("result"), lambda o: o.result()),
+        (is_a(InsertOneResult), compose(obj('insertedId'), attr('inserted_id'))),
+        (is_a(UpdateResult), compose(obj('upsertedId'), attr('upserted_id'))),
+        (has_attr('get'), lambda o: o.get()),
+        (has_attr('result'), lambda o: o.result()),
         else_=str,
     )(value)
 
@@ -68,15 +68,13 @@ _type_registry = TypeRegistry(
 
 class UniqFileGridFSBucket(GridFSBucket):
     def _find_one(self, filename):
-        return [*self.find({"filename": filename}).sort("uploadDate", -1).limit(1)]
+        return [*self.find({'filename': filename}).sort('uploadDate', -1).limit(1)]
 
     def _create_proxy(self, out: GridOut, opened=False):
-        fid: ObjectId = getattr(out, "_id")
+        fid: ObjectId = getattr(out, '_id')
         self.delete(fid)
         create_method = (
-            self.open_upload_stream_with_id
-            if opened
-            else self.upload_from_stream_with_id
+            self.open_upload_stream_with_id if opened else self.upload_from_stream_with_id
         )
         return partial(create_method, fid)
 
@@ -86,9 +84,7 @@ class UniqFileGridFSBucket(GridFSBucket):
             first,
         )
         return compose(
-            if_else(
-                not_, lambda _: self.open_upload_stream(filename, **kwargs), open_by_id
-            ),
+            if_else(not_, lambda _: self.open_upload_stream(filename, **kwargs), open_by_id),
             self._find_one,
         )(filename)
 
@@ -111,15 +107,11 @@ class UniqFileGridFSBucket(GridFSBucket):
 class AsyncUniqFileGridFSBucket:
     """异步版本的UniqFileGridFSBucket"""
 
-    def __init__(self, db, bucket_name="fs"):
-        self.bucket = motor.motor_asyncio.AsyncIOMotorGridFSBucket(
-            db, bucket_name=bucket_name
-        )
+    def __init__(self, db, bucket_name='fs'):
+        self.bucket = motor.motor_asyncio.AsyncIOMotorGridFSBucket(db, bucket_name=bucket_name)
 
     async def _find_one(self, filename):
-        cursor = (
-            self.bucket.find({"filename": filename}).sort("uploadDate", -1).limit(1)
-        )
+        cursor = self.bucket.find({'filename': filename}).sort('uploadDate', -1).limit(1)
         docs = []
         async for doc in cursor:
             docs.append(doc)
@@ -138,12 +130,10 @@ class AsyncUniqFileGridFSBucket:
         return await self.bucket.upload_from_stream(filename, source, **kwargs)
 
     async def upload_from_stream_with_id(self, file_id, filename, source, **kwargs):
-        return await self.bucket.upload_from_stream_with_id(
-            file_id, filename, source, **kwargs
-        )
+        return await self.bucket.upload_from_stream_with_id(file_id, filename, source, **kwargs)
 
     async def _create_proxy(self, grid_out: Any, opened=False):
-        fid: ObjectId = getattr(grid_out, "_id")
+        fid: ObjectId = getattr(grid_out, '_id')
         await self.delete(fid)
         if opened:
             return partial(self.open_upload_stream_with_id, fid)
@@ -195,7 +185,7 @@ class MongoClient:
         self.codec_options = CodecOptions(
             tz_aware=True,
             type_registry=_type_registry,
-            tzinfo=pytz.timezone("Asia/Shanghai"),
+            tzinfo=pytz.timezone('Asia/Shanghai'),
         )
 
     def get_database(self, db_name=None) -> Database:
@@ -215,9 +205,7 @@ class MongoClient:
             return self.async_client.get_default_database()
         return self.async_client.get_database(db_name)
 
-    def get_collection(
-        self, collection_name: Union[str, Enum], db_name=None
-    ) -> Collection:
+    def get_collection(self, collection_name: Union[str, Enum], db_name=None) -> Collection:
         """获取同步集合对象"""
         db = self.get_database(db_name)
         collection_name = enum_name(collection_name)
@@ -241,30 +229,24 @@ class MongoClient:
             if loop.is_closed():
                 # Create a new async client with a valid loop
                 loop = get_running_loop()
-                self.async_client = motor.motor_asyncio.AsyncIOMotorClient(
-                    self.uri, io_loop=loop
-                )
+                self.async_client = motor.motor_asyncio.AsyncIOMotorClient(self.uri, io_loop=loop)
         except (RuntimeError, AttributeError):
             # If we can't get the loop or there's another issue,
             # create a new async client with a valid loop
             loop = get_running_loop()
-            self.async_client = motor.motor_asyncio.AsyncIOMotorClient(
-                self.uri, io_loop=loop
-            )
+            self.async_client = motor.motor_asyncio.AsyncIOMotorClient(self.uri, io_loop=loop)
 
     def get_fs(self, db_name=None) -> GridFS:
         """获取同步GridFS对象"""
         db = self.get_database(db_name)
         return GridFS(db)
 
-    def get_fs_bucket(self, db_name=None, bucket_name="fs") -> UniqFileGridFSBucket:
+    def get_fs_bucket(self, db_name=None, bucket_name='fs') -> UniqFileGridFSBucket:
         """获取同步GridFSBucket对象"""
         db = self.get_database(db_name)
         return UniqFileGridFSBucket(db, bucket_name)
 
-    def get_async_fs_bucket(
-        self, db_name=None, bucket_name="fs"
-    ) -> AsyncUniqFileGridFSBucket:
+    def get_async_fs_bucket(self, db_name=None, bucket_name='fs') -> AsyncUniqFileGridFSBucket:
         """获取异步GridFSBucket对象"""
         db = self.get_async_database(db_name)
         return AsyncUniqFileGridFSBucket(db, bucket_name)
@@ -305,7 +287,7 @@ class MongoClient:
         if isinstance(collection, (str, Enum)):
             collection = self.get_collection(collection, db_name)
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        return collection.find_one({"_id": query_id}, **kwargs)
+        return collection.find_one({'_id': query_id}, **kwargs)
 
     def find_in_ids(
         self,
@@ -317,7 +299,7 @@ class MongoClient:
         """同步按多个ID查询"""
         if isinstance(collection, (str, Enum)):
             collection = self.get_collection(collection, db_name)
-        query = {"_id": {"$in": [ObjectId(n) for n in ids if n is not None]}}
+        query = {'_id': {'$in': [ObjectId(n) for n in ids if n is not None]}}
         return list(collection.find(query, **kwargs))
 
     def find_page(
@@ -335,15 +317,15 @@ class MongoClient:
             collection = self.get_collection(collection, db_name)
         skip = page_size * (page_no - 1)
         if sort is None:
-            sort = [("createdTime", pymongo.DESCENDING)]
-        query.setdefault("logicDeleted", False)
+            sort = [('createdTime', pymongo.DESCENDING)]
+        query.setdefault('logicDeleted', False)
         cursor = collection.find(query, **kwargs).sort(sort).skip(skip).limit(page_size)
         total = collection.count_documents(query)
         return {
-            "content": list(cursor),
-            "pageNo": page_no,
-            "pageSize": page_size,
-            "totalCount": total,
+            'content': list(cursor),
+            'pageNo': page_no,
+            'pageSize': page_size,
+            'totalCount': total,
         }
 
     def save(self, collection: Union[Collection, str, Enum], data: dict, db_name=None):
@@ -362,39 +344,39 @@ class MongoClient:
 
         data_copy = data.copy()  # 创建副本以避免修改原始数据
 
-        if "_id" in data_copy:
+        if '_id' in data_copy:
             # 从更新数据中提取_id
-            doc_id = data_copy["_id"]
+            doc_id = data_copy['_id']
 
             # 从$set中移除_id字段，避免MongoDB报错
             set_data = data_copy.copy()
-            if "_id" in set_data:
-                set_data.pop("_id")
+            if '_id' in set_data:
+                set_data.pop('_id')
 
             # 构建更新操作
             update_ops = {
-                "$set": set_data,
-                "$currentDate": {"updateTime": True},
-                "$inc": {"__v": 1},
+                '$set': set_data,
+                '$currentDate': {'updateTime': True},
+                '$inc': {'__v': 1},
             }
 
             # 更新现有文档
-            result = collection.update_one({"_id": doc_id}, update_ops, upsert=True)
+            updated = collection.update_one({'_id': doc_id}, update_ops, upsert=True)
 
-            if result.upserted_id:
-                data_copy["_id"] = result.upserted_id
+            if updated.upserted_id:
+                data_copy['_id'] = updated.upserted_id
 
             # 获取更新后的完整文档以包含updateTime和__v
-            return self.find_by_id(collection, data_copy["_id"])
+            return self.find_by_id(collection, data_copy['_id'])
         else:
             # 插入新文档
-            data_copy.setdefault("createTime", locnow())
-            data_copy.setdefault("__v", 0)
-            data_copy.setdefault("updateTime", locnow())
+            data_copy.setdefault('createTime', locnow())
+            data_copy.setdefault('__v', 0)
+            data_copy.setdefault('updateTime', locnow())
 
-            result = collection.insert_one(data_copy)
-            if result.inserted_id:
-                data_copy["_id"] = result.inserted_id
+            inserted = collection.insert_one(data_copy)
+            if inserted.inserted_id:
+                data_copy['_id'] = inserted.inserted_id
 
         return data_copy
 
@@ -410,16 +392,16 @@ class MongoClient:
             collection = self.get_collection(collection, db_name)
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        old = collection.find_one({"_id": query_id})
+        old = collection.find_one({'_id': query_id})
 
-        if "_id" in data:
-            data.pop("_id")
+        if '_id' in data:
+            data.pop('_id')
 
-        data.setdefault("__v", 0)
-        data["__v"] += 1
-        data["updateTime"] = locnow()
+        data.setdefault('__v', 0)
+        data['__v'] += 1
+        data['updateTime'] = locnow()
 
-        result = collection.replace_one({"_id": query_id}, data, upsert=True)
+        result = collection.replace_one({'_id': query_id}, data, upsert=True)
         if result.modified_count or result.upserted_id:
             return self.find_by_id(collection, query_id), old
 
@@ -436,13 +418,11 @@ class MongoClient:
             collection = self.get_collection(collection, db_name)
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        result = collection.delete_one({"_id": query_id})
+        result = collection.delete_one({'_id': query_id})
         return result.deleted_count
 
     # 异步操作方法
-    async def async_find(
-        self, collection: Union[str, Enum], query: dict, db_name=None, **kwargs
-    ):
+    async def async_find(self, collection: Union[str, Enum], query: dict, db_name=None, **kwargs):
         """异步查询多条记录"""
         async_collection = self.get_async_collection(collection, db_name)
         cursor = async_collection.find(query, **kwargs)
@@ -467,15 +447,13 @@ class MongoClient:
     ):
         """异步按ID查询"""
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        return await self.async_find_one(
-            collection, {"_id": query_id}, db_name, **kwargs
-        )
+        return await self.async_find_one(collection, {'_id': query_id}, db_name, **kwargs)
 
     async def async_find_in_ids(
         self, collection: Union[str, Enum], ids: List[str], db_name=None, **kwargs
     ):
         """异步按多个ID查询"""
-        query = {"_id": {"$in": [ObjectId(n) for n in ids if n is not None]}}
+        query = {'_id': {'$in': [ObjectId(n) for n in ids if n is not None]}}
         return await self.async_find(collection, query, db_name, **kwargs)
 
     async def async_find_page(
@@ -492,25 +470,20 @@ class MongoClient:
         async_collection = self.get_async_collection(collection, db_name)
         skip = page_size * (page_no - 1)
         if sort is None:
-            sort = [("createdTime", pymongo.DESCENDING)]
-        query.setdefault("logicDeleted", False)
+            sort = [('createdTime', pymongo.DESCENDING)]
+        query.setdefault('logicDeleted', False)
 
-        cursor = (
-            async_collection.find(query, **kwargs)
-            .sort(sort)
-            .skip(skip)
-            .limit(page_size)
-        )
+        cursor = async_collection.find(query, **kwargs).sort(sort).skip(skip).limit(page_size)
         docs = []
         async for doc in cursor:
             docs.append(doc)
 
         total = await async_collection.count_documents(query)
         return {
-            "content": docs,
-            "pageNo": page_no,
-            "pageSize": page_size,
-            "totalCount": total,
+            'content': docs,
+            'pageNo': page_no,
+            'pageSize': page_size,
+            'totalCount': total,
         }
 
     async def async_save(self, collection: Union[str, Enum], data: dict, db_name=None):
@@ -527,43 +500,41 @@ class MongoClient:
         async_collection = self.get_async_collection(collection, db_name)
         data_copy = data.copy()  # 创建副本以避免修改原始数据
 
-        if "_id" in data_copy:
+        if '_id' in data_copy:
             # 从更新数据中提取_id
-            doc_id = data_copy["_id"]
+            doc_id = data_copy['_id']
 
             # 从$set中移除_id字段，避免MongoDB报错
             set_data = data_copy.copy()
-            if "_id" in set_data:
-                set_data.pop("_id")
+            if '_id' in set_data:
+                set_data.pop('_id')
 
             # 构建更新操作
             update_ops = {
-                "$set": set_data,
-                "$currentDate": {"updateTime": True},
-                "$inc": {"__v": 1},
+                '$set': set_data,
+                '$currentDate': {'updateTime': True},
+                '$inc': {'__v': 1},
             }
 
             # 更新现有文档
-            result = await async_collection.update_one(
-                {"_id": doc_id}, update_ops, upsert=True
-            )
+            result = await async_collection.update_one({'_id': doc_id}, update_ops, upsert=True)
 
             # motor的UpdateResult直接提供upserted_id属性
             if result.upserted_id:
-                data_copy["_id"] = result.upserted_id
+                data_copy['_id'] = result.upserted_id
 
             # 获取更新后的完整文档以包含updateTime和__v
-            return await self.async_find_by_id(collection, data_copy["_id"], db_name)
+            return await self.async_find_by_id(collection, data_copy['_id'], db_name)
         else:
             # 插入新文档
-            data_copy.setdefault("createTime", locnow())
-            data_copy.setdefault("__v", 0)
-            data_copy.setdefault("updateTime", locnow())
+            data_copy.setdefault('createTime', locnow())
+            data_copy.setdefault('__v', 0)
+            data_copy.setdefault('updateTime', locnow())
 
             # motor的InsertOneResult直接提供inserted_id属性
             result = await async_collection.insert_one(data_copy)
             if result.inserted_id:
-                data_copy["_id"] = result.inserted_id
+                data_copy['_id'] = result.inserted_id
 
         return data_copy
 
@@ -589,19 +560,17 @@ class MongoClient:
         data_copy = data.copy()  # 创建副本以避免修改原始数据
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        old = await async_collection.find_one({"_id": query_id})
+        old = await async_collection.find_one({'_id': query_id})
 
-        if "_id" in data_copy:
-            data_copy.pop("_id")
+        if '_id' in data_copy:
+            data_copy.pop('_id')
 
-        data_copy.setdefault("__v", 0)
-        data_copy["__v"] += 1
-        data_copy["updateTime"] = locnow()
+        data_copy.setdefault('__v', 0)
+        data_copy['__v'] += 1
+        data_copy['updateTime'] = locnow()
 
         try:
-            result = await async_collection.replace_one(
-                {"_id": query_id}, data_copy, upsert=True
-            )
+            result = await async_collection.replace_one({'_id': query_id}, data_copy, upsert=True)
 
             if result.modified_count > 0 or result.upserted_id:
                 # 获取更新后的完整文档
@@ -615,7 +584,7 @@ class MongoClient:
             return None, old
         except Exception as e:
             # 记录异常，但不抛出，保持与同步API一致的行为
-            print(f"Error in async_replace: {e}")
+            print(f'Error in async_replace: {e}')
             return None, old
 
     async def async_delete(
@@ -635,16 +604,16 @@ class MongoClient:
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
         try:
-            result = await async_collection.delete_one({"_id": query_id})
+            result = await async_collection.delete_one({'_id': query_id})
             return result.deleted_count
         except Exception as e:
-            print(f"Error in async_delete: {e}")
+            print(f'Error in async_delete: {e}')
             return 0
 
     def create_proxy(self, collection_name: str, db_name=None):
         """创建集合代理对象，提供简化的操作方法"""
         proxy_obj = namedtuple(
-            f"{self.alias}_{collection_name}", "all,find,add,update,replace,delete"
+            f'{self.alias}_{collection_name}', 'all,find,add,update,replace,delete'
         )
 
         def all(**kwargs):
@@ -654,7 +623,7 @@ class MongoClient:
             return self.find(collection_name, query, db_name, **kwargs)
 
         def add(data):
-            data.setdefault("createTime", locnow())
+            data.setdefault('createTime', locnow())
             return self.save(collection_name, data, db_name)
 
         def update(_id, data, **kwargs):
@@ -662,7 +631,7 @@ class MongoClient:
             if current:
                 data_to_update = current.copy()
                 data_to_update.update(data)
-                data_to_update["_id"] = current["_id"]
+                data_to_update['_id'] = current['_id']
                 result = self.save(collection_name, data_to_update, db_name)
                 return result
             return None
@@ -679,8 +648,8 @@ class MongoClient:
     def create_async_proxy(self, collection_name: str, db_name=None):
         """创建异步集合代理对象，提供简化的异步操作方法"""
         proxy_obj = namedtuple(
-            f"{self.alias}_{collection_name}_async",
-            "all,find,add,update,replace,delete",
+            f'{self.alias}_{collection_name}_async',
+            'all,find,add,update,replace,delete',
         )
 
         async def all(**kwargs):
@@ -690,7 +659,7 @@ class MongoClient:
             return await self.async_find(collection_name, query, db_name, **kwargs)
 
         async def add(data):
-            data.setdefault("createTime", locnow())
+            data.setdefault('createTime', locnow())
             return await self.async_save(collection_name, data, db_name)
 
         async def update(_id, data, **kwargs):
@@ -707,7 +676,7 @@ class MongoClient:
             if current:
                 data_to_update = current.copy()
                 data_to_update.update(data)
-                data_to_update["_id"] = current["_id"]
+                data_to_update['_id'] = current['_id']
                 return await self.async_save(collection_name, data_to_update, db_name)
             return None
 
@@ -778,7 +747,7 @@ def exists(name: str):
     return name in __clients
 
 
-def new_client(uri: str, alias: str = None) -> MongoClient:
+def new_client(uri: str, alias: Optional[str] = None) -> MongoClient:
     """创建新的MongoDB客户端实例"""
     db_name = alias if alias is not None else uuid4().hex
     client = MongoClient(uri, db_name)
@@ -786,14 +755,14 @@ def new_client(uri: str, alias: str = None) -> MongoClient:
     return client
 
 
-def get_client(alias: str = None) -> MongoClient:
+def get_client(alias: Optional[str] = None) -> MongoClient:
     """获取指定别名的客户端实例"""
     if alias is None:
         alias = first(list(__clients.keys()))
     return __clients[alias]
 
 
-def load(conf: dict):
+def load(conf: dict[str, Any]) -> None:
     """从配置加载多个MongoDB连接"""
     if conf and len(conf) > 0:
         for key in conf:
@@ -801,30 +770,30 @@ def load(conf: dict):
             # print(f'mongodb: [{key}] connected')
 
 
-def instances():
+def instances() -> list[str]:
     """获取所有客户端实例名称"""
     return list(__clients.keys())
 
 
 # 兼容旧API的辅助函数
-def conn(key=None) -> MongoClient:
+def conn(key: Optional[str] = None) -> MongoClient:
     """获取客户端连接（兼容旧API）"""
     return get_client(key)
 
 
-def get_collection(tag, collection: Union[str, Enum], db_name=None):
+def get_collection(tag: str, collection: Union[str, Enum], db_name: Optional[str] = None):
     """获取集合对象（兼容旧API）"""
     client = get_client(tag)
     return client.get_collection(collection, db_name)
 
 
-def fs_client(key=None) -> GridFS:
+def fs_client(key: Optional[str] = None) -> GridFS:
     """获取GridFS对象（兼容旧API）"""
     client = get_client(key)
     return client.get_fs()
 
 
-def fs_bucket(db_name, bucket_name="fs") -> UniqFileGridFSBucket:
+def fs_bucket(db_name: Optional[str] = None, bucket_name: str = 'fs') -> UniqFileGridFSBucket:
     """获取GridFSBucket对象（兼容旧API）"""
     client = get_client(db_name)
     return client.get_fs_bucket(bucket_name=bucket_name)
@@ -856,39 +825,39 @@ def save(collection, data):
     """保存数据（兼容旧API）"""
     data_copy = data.copy()  # 创建副本以避免修改原始数据
 
-    if "_id" in data_copy:
-        doc_id = data_copy["_id"]
+    if '_id' in data_copy:
+        doc_id = data_copy['_id']
 
         # 从$set中移除_id字段，避免MongoDB报错
         set_data = data_copy.copy()
-        if "_id" in set_data:
-            set_data.pop("_id")
+        if '_id' in set_data:
+            set_data.pop('_id')
 
         # 构建更新操作，包含currentDate和inc
         update_ops = {
-            "$set": set_data,
-            "$currentDate": {"updateTime": True},
-            "$inc": {"__v": 1},
+            '$set': set_data,
+            '$currentDate': {'updateTime': True},
+            '$inc': {'__v': 1},
         }
 
-        r = collection.update_one({"_id": doc_id}, update_ops, upsert=True)
+        r = collection.update_one({'_id': doc_id}, update_ops, upsert=True)
 
-        if hasattr(r, "upserted_id") and r.upserted_id:
-            data_copy["_id"] = r.upserted_id
+        if hasattr(r, 'upserted_id') and r.upserted_id:
+            data_copy['_id'] = r.upserted_id
 
         # 获取完整更新后的文档
-        updated = collection.find_one({"_id": doc_id if doc_id else data_copy["_id"]})
+        updated = collection.find_one({'_id': doc_id if doc_id else data_copy['_id']})
         if updated:
             return updated
     else:
         # 添加createTime、updateTime和初始版本字段
-        data_copy.setdefault("createTime", locnow())
-        data_copy.setdefault("updateTime", locnow())
-        data_copy.setdefault("__v", 0)
+        data_copy.setdefault('createTime', locnow())
+        data_copy.setdefault('updateTime', locnow())
+        data_copy.setdefault('__v', 0)
 
         r = collection.insert_one(data_copy)
-        if hasattr(r, "inserted_id"):
-            data_copy["_id"] = r.inserted_id
+        if hasattr(r, 'inserted_id'):
+            data_copy['_id'] = r.inserted_id
 
     return data_copy
 
@@ -896,8 +865,8 @@ def save(collection, data):
 @curry
 def replace_one(collection, data):
     """替换数据（兼容旧API）"""
-    assert "_id" in data, "must include _id field in data."
-    query = {"_id": data["_id"]}
+    assert '_id' in data, 'must include _id field in data.'
+    query = {'_id': data['_id']}
     old = collection.find_one(query)
     collection.replace_one(query, data, upsert=True)
     return data, old
@@ -908,15 +877,15 @@ def find_page(collection, query, page_size=10, page_no=1, sort=None):
     assert is_a(Collection, collection)
     skip = page_size * (page_no - 1)
     if sort is None:
-        sort = [("createdTime", pymongo.DESCENDING)]
-    query["logicDeleted"] = False
+        sort = [('createdTime', pymongo.DESCENDING)]
+    query['logicDeleted'] = False
     cursor = collection.find(query).sort(sort).skip(skip).limit(page_size)
     total = collection.count_documents(query)
     return {
-        "content": list(cursor),
-        "pageNo": page_no,
-        "pageSize": page_size,
-        "totalCount": total,
+        'content': list(cursor),
+        'pageNo': page_no,
+        'pageSize': page_size,
+        'totalCount': total,
     }
 
 
@@ -944,24 +913,24 @@ class BaseModel:
 
     def find_by_id(self, _id: Union[str, ObjectId]):
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
-        return self.collection.find_one(filter={"_id": query_id})
+        return self.collection.find_one(filter={'_id': query_id})
 
     def find_in_ids(self, ids: List[str], *args):
-        query = {"_id": {"$in": [ObjectId(n) for n in ids if n is not None]}}
+        query = {'_id': {'$in': [ObjectId(n) for n in ids if n is not None]}}
         return list(self.collection.find(query, *args))
 
-    def _save(self, sepc_field: str = None, **kwargs):
-        assert (
-            "_id" in kwargs or not not_(sepc_field) and sepc_field in kwargs
-        ), f"must had [_id] field or [{sepc_field}] field"
+    def _save(self, sepc_field: Optional[str] = None, **kwargs: Any):
+        assert '_id' in kwargs or not not_(sepc_field) and sepc_field in kwargs, (
+            f'must had [_id] field or [{sepc_field}] field'
+        )
         query = if_else(
-            in_(_, "_id"),
-            compose(obj("_id"), popitem("_id")),
+            in_(_, '_id'),
+            compose(obj('_id'), popitem('_id')),
             compose(obj(sepc_field), getitem(sepc_field)),
         )
         return self.collection.find_one_and_update(
             filter=query(kwargs),
-            update={"$set": kwargs},
+            update={'$set': kwargs},
             upsert=True,
             return_document=ReturnDocument.AFTER,
         )

@@ -1,5 +1,5 @@
 from html import escape
-from typing import Callable, Union, override, cast, Tuple, Any
+from typing import Any, Callable, Tuple, Union, cast, override
 
 from jcramda import when
 from jcramda.base.comparison import is_a_str, is_a_tuple

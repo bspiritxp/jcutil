@@ -1,3 +1,8 @@
+"""
+Network IO functions
+@author Jochen.He
+"""
+
 import asyncio
 import json
 from io import BytesIO
@@ -153,19 +158,19 @@ async def download_to_file(url, destination_path, chunk_size=1024 * 1024, **kwar
         try:
             async with client.stream("GET", url, **kwargs) as response:
                 response.raise_for_status()
-                
+
                 # Ensure directory exists
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                content_length = response.headers.get("content-length")
-                total_size = int(content_length) if content_length else 0
+
+                # content_length = response.headers.get("content-length")
+                # total_size = int(content_length) if content_length else 0
                 downloaded = 0
-                
+
                 async with aiofiles.open(dest_path, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                         await f.write(chunk)
                         downloaded += len(chunk)
-                
+
                 return True
         except httpx.HTTPError:
             return False
@@ -201,7 +206,7 @@ async def upload_file(
 
     # Prepare files for httpx
     files = {field_name: (file_path.name, open(file_path, "rb"), "application/octet-stream")}
-    
+
     # Prepare additional data
     data = additional_data or {}
 
@@ -251,7 +256,7 @@ async def upload_bytes(
 
     # Prepare files for httpx
     files = {field_name: (filename, file_bytes, content_type)}
-    
+
     # Prepare additional data
     data = additional_data or {}
 
@@ -358,7 +363,7 @@ class EventSourceClient:
         """
         if self._client is None:
             self._client = httpx.AsyncClient()
-        
+
         self._running = True
 
         while self._running:
@@ -494,7 +499,7 @@ class WebSocketClient:
         """
         if not self._ws:
             raise ConnectionError("WebSocket not connected")
-        
+
         try:
             message = await self._ws.recv()
             if isinstance(message, str):

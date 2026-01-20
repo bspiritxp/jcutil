@@ -19,6 +19,7 @@ from uuid import uuid4
 from jcramda import (
     _,
     compose,
+    default_to,
     hexdigest,
     identity,
     join,

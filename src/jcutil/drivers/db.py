@@ -1,10 +1,20 @@
+"""
+jcutil.drivers.db
+数据库连接管理
+
+ - 创建数据库连接
+ - 获取数据库连接
+@package jcutil.drivers.db
+@author: Jochen.He
+"""
 import logging
 from importlib import import_module
-from typing import Any, Dict, List, Union, Optional, Callable
+from typing import Any, Callable, Optional, Union
 
 try:
     from sqlalchemy.engine import Engine  # pyright: ignore [reportMissingImports]
     from sqlalchemy.ext.asyncio import AsyncEngine  # pyright: ignore [reportMissingImports]
+
     SQLALCHEMY_AVAILABLE = True
 except ImportError:
     SQLALCHEMY_AVAILABLE = False
@@ -14,15 +24,15 @@ except ImportError:
 from jcramda import loc
 
 __all__ = [
-    "connect",
-    "conn",
-    "init_engine",
-    "new_client",
-    "get_client",
-    "load",
-    "instances",
-    "close_engine",
-    "close_all_engines",
+    'connect',
+    'conn',
+    'init_engine',
+    'new_client',
+    'get_client',
+    'load',
+    'instances',
+    'close_engine',
+    'close_all_engines',
 ]
 
 __engines = dict()
@@ -44,34 +54,34 @@ def init_engine(tag: str, *args, create_engine: Optional[Callable] = None, **kwa
 
     :return: configured database engine
     """
-    schema = kwargs.get("schema", "oracle")
+    schema = kwargs.get('schema', 'oracle')
     if create_engine is None:
-        sqlmodule = import_module("sqlalchemy")
+        sqlmodule = import_module('sqlalchemy')
         url = (
-            "{schema}://{user}:{password}@{dsn}?encoding=utf-8".format(
+            '{schema}://{user}:{password}@{dsn}?encoding=utf-8'.format(
                 schema=schema,
-                user=kwargs["user"],
-                password=kwargs["password"],
-                dsn=kwargs["dsn"],
+                user=kwargs['user'],
+                password=kwargs['password'],
+                dsn=kwargs['dsn'],
             )
-            if "url" not in kwargs
-            else kwargs.pop("url")
+            if 'url' not in kwargs
+            else kwargs.pop('url')
         )
-        if "async" in schema:
+        if 'async' in schema:
             current_engine = sqlmodule.create_async_engine(url, pool_size=20, **kwargs)
         else:
-            current_engine = sqlmodule.create_engine(
-                url, pool_size=20, **kwargs
-            )
+            current_engine = sqlmodule.create_engine(url, pool_size=20, **kwargs)
     else:
         current_engine = create_engine(*args, **kwargs)
     __engines[tag] = current_engine
     return current_engine
 
 
-def new_client(tag: str, *args: Any, create_engine: Optional[Callable] = None, **kwargs: Any) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
+def new_client(
+    tag: str, *args: Any, create_engine: Optional[Callable] = None, **kwargs: Any
+) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
     """Create and register a new database client
-    
+
     :param tag: identifier for the client
     :param create_engine: engine creation function
     :param kwargs: engine configuration
@@ -79,11 +89,11 @@ def new_client(tag: str, *args: Any, create_engine: Optional[Callable] = None, *
     """
     if create_engine is None:
         try:
-            module = import_module("sqlalchemy")
-            create_engine = getattr(module, "create_engine")
+            module = import_module('sqlalchemy')
+            create_engine = getattr(module, 'create_engine')
         except ModuleNotFoundError as err:
-            logging.error(f"SQLAlchemy not found: {err}")
-            raise ImportError("SQLAlchemy is required for database operations") from err
+            logging.error(f'SQLAlchemy not found: {err}')
+            raise ImportError('SQLAlchemy is required for database operations') from err
     else:
         __engines[tag] = create_engine(*args, **kwargs)
     return __engines[tag]
@@ -91,7 +101,7 @@ def new_client(tag: str, *args: Any, create_engine: Optional[Callable] = None, *
 
 def get_client(name: Union[str, int] = 0) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
     """Get database engine by name or index
-    
+
     :param name: engine identifier or index
     :return: database engine
     :raises RuntimeError: if no engines available or engine not found
@@ -101,12 +111,12 @@ def get_client(name: Union[str, int] = 0) -> Engine:  # pyright: ignore [reportI
             return loc(name, __engines)
         except (KeyError, IndexError) as err:
             raise RuntimeError(f"Database engine '{name}' not found") from err
-    raise RuntimeError("No database engines available")
+    raise RuntimeError('No database engines available')
 
 
 def connect(n: Union[str, int] = 0):
     """Get database connection
-    
+
     :param n: engine identifier or index
     :return: database connection
     """
@@ -114,7 +124,7 @@ def connect(n: Union[str, int] = 0):
     if hasattr(engine, 'connect'):
         return engine.connect()
     else:
-        raise RuntimeError(f"Engine {n} does not support connection")
+        raise RuntimeError(f'Engine {n} does not support connection')
 
 
 def load(conf: dict[str, str]) -> None:
@@ -134,7 +144,7 @@ def load(conf: dict[str, str]) -> None:
             try:
                 init_engine(key, url=conf[key])
             except Exception as err:
-                logging.warning(f"load database [{key}] failed: {err}")
+                logging.warning(f'load database [{key}] failed: {err}')
             # print(f'database [{key}] connected')
 
 
@@ -143,7 +153,7 @@ conn = connect
 
 def instances() -> list[str]:
     """Get all registered engine identifiers
-    
+
     :return: list of engine names
     """
     return [*__engines.keys()]
@@ -151,7 +161,7 @@ def instances() -> list[str]:
 
 def close_engine(tag: Union[str, int]) -> None:
     """Close and remove a specific database engine
-    
+
     :param tag: engine identifier or index
     """
     try:
@@ -162,10 +172,10 @@ def close_engine(tag: Union[str, int]) -> None:
             tag = instances()[tag]
         __engines.pop(tag, None)
     except Exception as err:
-        logging.warning(f"Failed to close engine {tag}: {err}")
+        logging.warning(f'Failed to close engine {tag}: {err}')
 
 
 def close_all_engines() -> None:
-    """Close and remove all database engines""" 
+    """Close and remove all database engines"""
     for tag in list(instances()):
         close_engine(tag)

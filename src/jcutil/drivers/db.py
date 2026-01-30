@@ -67,8 +67,8 @@ def init_engine(tag: str, *args, create_engine: Optional[Callable] = None, **kwa
             if 'url' not in kwargs
             else kwargs.pop('url')
         )
-        if 'async' in schema:
-            current_engine = sqlmodule.create_async_engine(url, pool_size=20, **kwargs)
+        if 'async' in url:
+            current_engine = sqlmodule.ext.asyncio.create_async_engine(url, pool_size=20, **kwargs)
         else:
             current_engine = sqlmodule.create_engine(url, pool_size=20, **kwargs)
     else:
@@ -79,7 +79,7 @@ def init_engine(tag: str, *args, create_engine: Optional[Callable] = None, **kwa
 
 def new_client(
     tag: str, *args: Any, create_engine: Optional[Callable] = None, **kwargs: Any
-) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
+) -> Engine | AsyncEngine:  # pyright: ignore [reportInvalidTypeForm]
     """Create and register a new database client
 
     :param tag: identifier for the client
@@ -87,19 +87,9 @@ def new_client(
     :param kwargs: engine configuration
     :return: created database engine
     """
-    if create_engine is None:
-        try:
-            module = import_module('sqlalchemy')
-            create_engine = getattr(module, 'create_engine')
-        except ModuleNotFoundError as err:
-            logging.error(f'SQLAlchemy not found: {err}')
-            raise ImportError('SQLAlchemy is required for database operations') from err
-    else:
-        __engines[tag] = create_engine(*args, **kwargs)
-    return __engines[tag]
+    return init_engine(tag, *args, create_engine=create_engine, **kwargs)
 
-
-def get_client(name: Union[str, int] = 0) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
+def get_client(name: Union[str, int] = 0) -> Engine | AsyncEngine:  # pyright: ignore [reportInvalidTypeForm]
     """Get database engine by name or index
 
     :param name: engine identifier or index

@@ -41,6 +41,11 @@ dev = [
     "ruff",
 ]
 
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+
 [tool.ruff]
 # 启用的规则集
 lint.select = [

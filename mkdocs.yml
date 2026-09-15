@@ -1,0 +1,57 @@
+site_name: jcutil 使用手册
+site_description: jcutil 2.1 的用户指南与 API 参考
+repo_name: Jochen-He/jcutil
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            docstring_options:
+              warnings: false
+            filters:
+              - '!^_'
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+
+nav:
+  - 首页: index.md
+  - 入门: getting-started.md
+  - 使用指南:
+      - 核心、JSON 与并发: guides/core.md
+      - 标签化驱动: guides/drivers.md
+      - 密码与密码学: guides/security.md
+      - HTTP、SSE 与 WebSocket: guides/network.md
+      - 缓存与持久化: guides/cache.md
+      - Consul、服务端配置与调度: guides/integrations.md
+  - API 参考:
+      - 核心与终端: reference/core-and-chalk.md
+      - 驱动: reference/drivers.md
+      - 安全、缓存与网络: reference/security-cache-network.md
+      - Consul、服务端与调度: reference/integrations.md
+  - 设计与边界: explanation.md
+  - 文档维护: maintenance.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true

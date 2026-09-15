@@ -45,6 +45,22 @@ jcutil/
 `netio`|异步网络请求工具
 `schedjob`|定时任务工具（默认使用MongoDB存储）
 
+## 使用手册
+
+面向使用者的完整手册、按任务组织的指南和自动同步的 API 参考位于 [`docs/`](docs/index.md)。
+
+本地浏览：
+
+```bash
+uv run --group docs mkdocs serve
+```
+
+提交前构建并检查链接：
+
+```bash
+uv run --group docs mkdocs build --strict
+```
+
 ## 详细文档
 
 ### 1. Chalk - 控制台彩色输出工具

@@ -8,7 +8,7 @@
 
 | 需求 | 模块 | 从这里开始 |
 | --- | --- | --- |
-| 彩色终端文本或交互菜单 | `jcutil.chalk` | [核心与终端 API](reference/core-and-chalk.md) |
+| 彩色终端文本 | `jcutil.chalk` | [核心与终端 API](reference/core-and-chalk.md) |
 | JSON、对象序列化、线程池辅助函数 | `jcutil.core` | [核心、JSON 与并发](guides/core.md) |
 | SQLAlchemy、MongoDB、Redis、Kafka 的命名连接 | `jcutil.drivers` | [标签化驱动](guides/drivers.md) |
 | 密码哈希、令牌、AES、RSA、摘要 | `jcutil.crypto_utils`、`jcutil.crypto` | [密码与密码学](guides/security.md) |
@@ -40,11 +40,11 @@ MongoDB、Redis、Kafka、Consul 与 APScheduler 都是客户端封装；相应�
 ```python
 from datetime import datetime, timezone
 
-from jcutil.chalk import GreenChalk
+from jcutil.chalk import Color, render
 from jcutil.core import to_json, to_obj
 
 encoded = to_json({'created_at': datetime(2026, 9, 15, tzinfo=timezone.utc)})
-print(GreenChalk(encoded))
+print(render(encoded, fg=Color.GREEN))
 assert to_obj(encoded)['created_at'] == '2026-09-15 00:00:00'
 ```
 

@@ -1,7 +1,7 @@
 import logging
 
-from jcutil import chalk
 from jcutil import consul as kv
+from jcutil.chalk import Color, render
 from jcutil.drivers import smart_load
 from jcutil.server.envars import global_envars
 
@@ -35,7 +35,7 @@ def load_config(*args, config_path=global_envars.CONFIG_PATH, v=True):
             needed_conf[key] = conf[key]
         conf = needed_conf
     if v:
-        print(config_path, ":", chalk.GreenChalk(conf))
+        print(config_path, ":", render(conf, fg=Color.GREEN))
     try:
         smart_load(conf)
         context["conf"] = conf

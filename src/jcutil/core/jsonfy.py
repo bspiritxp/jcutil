@@ -146,9 +146,12 @@ def pp_json(obj: object) -> str:
 
         lexer = get_lexer_by_name('json')
         formatter = get_formatter_by_name('terminal')
-        colorful_json = highlight(printed_str, lexer, formatter)
-    except (ModuleNotFoundError, ClassNotFound):
-        from jcutil.chalk import GreenChalk
+        return highlight(printed_str, lexer, formatter)
+    except ModuleNotFoundError:
+        pass
+    except ClassNotFound:
+        pass
 
-        colorful_json = GreenChalk(printed_str)
-    return colorful_json
+    from jcutil.chalk import Color, render
+
+    return render(printed_str, fg=Color.GREEN)

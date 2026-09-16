@@ -67,156 +67,72 @@ uv run --group docs mkdocs build --strict
 
 ### 1. Chalk - 控制台彩色输出工具
 
-在终端中输出带有颜色和格式的文本，支持链式调用、样式组合和嵌套使用。
+`jcutil.chalk` 同时提供直接渲染函数和增量式 `Chalk`。`render()` 适合单段文本；`Chalk` 则表示一支正在使用的粉笔：选颜色或样式、写入一段文本、再换一支粉笔继续写。每次 `write()` 都会快照当前属性，后续变更不会影响已写入的文字。
 
-#### 安装依赖
-
-Chalk模块依赖`colorama`库以支持跨平台彩色输出：
-
-```bash
-pip install colorama
-```
-
-#### 基本用法
+#### Chalk 链式写作
 
 ```python
-from jcutil.chalk import RedChalk, GreenChalk, YellowChalk, FontFormat
+from jcutil.chalk import Chalk, ColorMode
 
-# 基本颜色输出
-print(RedChalk("这是红色文本"))
-print(GreenChalk("这是绿色文本"))
-
-# 链式调用
-print(YellowChalk().bold("粗体黄色文本").text(" 普通黄色文本"))
-
-# 嵌套使用
-print(GreenChalk(f"绿色文本中嵌入{RedChalk('红色文本')}继续绿色"))
-
-# 文本连接
-result = RedChalk("红色") + " 普通文本 " + GreenChalk("绿色")
-print(result)
+message = (
+    Chalk(mode=ColorMode.ALWAYS)
+    .green('服务')
+    .bold()
+    .write(' 已启动')
+    .red()
+    .style()
+    .write('；等待请求')
+)
+print(f'状态: {message}')
 ```
 
-#### 可用颜色
+`Chalk` 是可变的链式 builder，所有选色、选背景、选样式和 `write()` 方法都返回同一个实例。使用 `color()`、`background()` 和 `style()` 设置后续文本；`style()` 不带参数会清除当前样式，`reset()` 会清除颜色、背景和样式。`red()`、`green()` 等颜色方法以及 `bold()`、`italic()`、`underline()` 等样式方法可以直接接收要写入的文本。
 
-Chalk提供了以下预定义颜色：
+兼容旧调用：`RedChalk`、`GreenChalk`、`BlueChalk`、其余基础色与全部 `Bright*Chalk` 工厂，以及 `BoldChalk` 都仍可用。例如 `RedChalk('错误')` 等价于 `Chalk('错误', Color.RED)`，并返回同样可继续链式调用的 `Chalk` 实例。
 
-- `BlackChalk` - 黑色
-- `RedChalk` - 红色
-- `GreenChalk` - 绿色
-- `YellowChalk` - 黄色
-- `BlueChalk` - 蓝色
-- `MagentaChalk` - 洋红色
-- `CyanChalk` - 青色
-- `WhiteChalk` - 白色
-
-此外，还提供了明亮色系列：
-
-- `BrightBlackChalk` - 亮黑色(灰色)
-- `BrightRedChalk` - 亮红色
-- `BrightGreenChalk` - 亮绿色
-- `BrightYellowChalk` - 亮黄色
-- `BrightBlueChalk` - 亮蓝色
-- `BrightMagentaChalk` - 亮洋红色
-- `BrightCyanChalk` - 亮青色
-- `BrightWhiteChalk` - 亮白色
-
-#### 文本样式
-
-可以通过以下方式为文本添加样式：
+#### 直接渲染
 
 ```python
-from jcutil.chalk import RedChalk, FontFormat
+from jcutil.chalk import Color, TextStyle, render
 
-# 使用样式方法
-print(RedChalk().bold("粗体文本"))
-print(RedChalk().italic("斜体文本"))
-print(RedChalk().underline("下划线文本"))
-
-# 链式组合样式
-print(RedChalk().bold("粗体").text(" 普通 ").italic("斜体").text(" 组合样式"))
-
-# 使用use方法设置样式
-print(RedChalk().use(FontFormat.BOLD, FontFormat.UNDER_LINE).text("粗体下划线"))
+message = render('服务已启动', fg=Color.GREEN, styles=(TextStyle.BOLD,))
+print(f'状态: {message}')
 ```
 
-支持的样式类型（`FontFormat`枚举）：
+#### 颜色、背景和样式
 
-- `BOLD` - 粗体
-- `LIGHT` - 轻体
-- `ITALIC` - 斜体
-- `UNDER_LINE` - 下划线
-- `BLINK` - 闪烁
-- `RESERVE` - 反相
-- `DELETE` - 删除线
-
-#### 高级用法
-
-##### 背景色设置
+`Color` 提供标准和明亮的 16 个 ANSI 前景色；将同一个颜色用于 `bg` 时会生成相应背景色。`TextStyle` 提供 `BOLD`、`DIM`、`ITALIC`、`UNDERLINE`、`REVERSE` 和 `STRIKETHROUGH`。
 
 ```python
-from jcutil.chalk import Chalk, Color
+from jcutil.chalk import Color, TextStyle, render
 
-# 设置前景色和背景色
-print(Chalk("彩色文本", fgc=Color.WHITE, bgc=Color.RED))
-
-# 使用use方法设置背景色
-print(Chalk().use(fg_color=Color.BLACK, bg_color=Color.YELLOW).text("黑字黄底"))
+warning = render(
+    '磁盘空间不足',
+    fg=Color.BLACK,
+    bg=Color.YELLOW,
+    styles=(TextStyle.BOLD, TextStyle.UNDERLINE),
+)
+print(f'警告: {warning}')
 ```
 
-##### 字符串格式化
+除粗体等基础效果外，样式的可视支持由终端决定。该模块不声明 256 色或真彩色兼容性。
+
+#### 输出策略
+
+`ColorMode.AUTO` 是默认策略：仅在目标 stream 是 TTY 且 `TERM` 不为 `dumb` 时输出 ANSI。`stream` 未指定时检查 `sys.stdout`，因此重定向输出默认保持纯文本。非空的 `NO_COLOR` 仅在 `AUTO` 下禁用前景和背景色，保留请求的文本样式。
 
 ```python
-from jcutil.chalk import RedChalk
+from jcutil.chalk import Color, ColorMode, render
 
-# 使用%操作符
-print(RedChalk("值: %d") % 42)
+# 即使输出被重定向，也明确要求颜色。
+payload = render('已完成', fg=Color.GREEN, mode=ColorMode.ALWAYS)
+print(f'任务: {payload}')
 
-# 嵌入f-string
-name = "世界"
-print(RedChalk(f"你好，{name}！"))
+# 明确禁用全部 ANSI 属性。
+print(f'任务: {render("已完成", fg=Color.GREEN, mode=ColorMode.NEVER)}')
 ```
 
-##### 菜单生成
-
-Chalk模块提供了生成交互式菜单的功能：
-
-```python
-from jcutil.chalk import show_menu
-
-def option1():
-    print("选择了选项1")
-    return "选项1结果"
-
-def option2():
-    print("选择了选项2")
-    return "选项2结果"
-
-# 定义菜单项列表 [(显示文本, 执行函数), ...]
-menu_items = [
-    ("选项1", option1),
-    ("选项2", option2),
-]
-
-# 显示菜单并获取用户选择结果
-result = show_menu(menu_items, title="测试菜单")
-print(f"返回结果: {result}")
-```
-
-#### 自定义Chalk
-
-可以通过基础`Chalk`类创建自定义样式：
-
-```python
-from jcutil.chalk import Chalk, Color, FontFormat
-
-# 创建自定义彩色文本函数
-WarningChalk = lambda text=None: Chalk(text, fgc=Color.BLACK, bgc=Color.YELLOW)
-ErrorChalk = lambda text=None: Chalk(text, fgc=Color.WHITE, bgc=Color.RED, styles=(FontFormat.BOLD,))
-
-print(WarningChalk("警告信息"))
-print(ErrorChalk("错误信息"))
-```
+`ALWAYS` 和 `NEVER` 都会覆盖 TTY、`TERM` 与 `NO_COLOR` 自动策略。Windows 上仅在实际选择输出 ANSI 时，`enable_windows_ansi()` 才会通过已声明的 `colorama` 依赖启用虚拟终端支持；模块导入本身不会初始化终端。
 
 ### 2. Drivers - 数据库驱动工具
 

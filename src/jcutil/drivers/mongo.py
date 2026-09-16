@@ -1,17 +1,17 @@
+import asyncio
 from collections import namedtuple
 from decimal import Decimal
 from enum import Enum
-from functools import partial
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-import motor.motor_asyncio
 import pymongo
 import pytz
 from bson import CodecOptions, Decimal128, ObjectId
 from bson.codec_options import TypeRegistry
 from bson.json_util import dumps, loads
-from gridfs import GridFS, GridFSBucket, GridOut
+from gridfs import GridFS, GridFSBucket
+from gridfs.asynchronous import AsyncGridFS, AsyncGridFSBucket
 from jcramda import (
     _,
     attr,
@@ -30,11 +30,10 @@ from jcramda import (
     popitem,
     when,
 )
+from pymongo import AsyncMongoClient
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.database import Database
 from pymongo.results import InsertOneResult, UpdateResult
-
-from jcutil.core import get_running_loop
 
 
 def fallback_encoder(value):
@@ -67,113 +66,60 @@ _type_registry = TypeRegistry(
 
 
 class UniqFileGridFSBucket(GridFSBucket):
-    def _find_one(self, filename):
-        return [*self.find({'filename': filename}).sort('uploadDate', -1).limit(1)]
+    """GridFS bucket that replaces the latest file with the same name."""
 
-    def _create_proxy(self, out: GridOut, opened=False):
-        fid: ObjectId = getattr(out, '_id')
-        self.delete(fid)
-        create_method = (
-            self.open_upload_stream_with_id if opened else self.upload_from_stream_with_id
-        )
-        return partial(create_method, fid)
+    def _find_one(self, filename):
+        return next(iter(self.find({'filename': filename}).sort('uploadDate', -1).limit(1)), None)
+
+    def _delete_existing(self, filename):
+        grid_out = self._find_one(filename)
+        if grid_out is not None:
+            self.delete(grid_out._id)
 
     def open_save_file(self, filename, **kwargs):
-        open_by_id = compose(
-            lambda grid_out: self._create_proxy(grid_out, True)(filename, **kwargs),
-            first,
-        )
-        return compose(
-            if_else(not_, lambda _: self.open_upload_stream(filename, **kwargs), open_by_id),
-            self._find_one,
-        )(filename)
+        """Open a replacement upload stream while retaining the legacy name."""
+        self._delete_existing(filename)
+        return self.open_upload_stream(filename, **kwargs)
 
-    def save_file(self, filename, **kwargs):
-        upload_by_id = compose(
-            lambda grid_out: self._create_proxy(grid_out)(filename, **kwargs),
-            first,
-        )
-
-        return compose(
-            if_else(
-                not_,
-                lambda _: self.upload_from_stream(filename, **kwargs),
-                upload_by_id,
-            ),
-            self._find_one,
-        )(filename)
+    def save_file(self, filename, source, **kwargs):
+        """Upload *source*, replacing the most recent file with this name."""
+        self._delete_existing(filename)
+        return self.upload_from_stream(filename, source, **kwargs)
 
 
-class AsyncUniqFileGridFSBucket:
-    """异步版本的UniqFileGridFSBucket"""
-
-    def __init__(self, db, bucket_name='fs'):
-        self.bucket = motor.motor_asyncio.AsyncIOMotorGridFSBucket(db, bucket_name=bucket_name)
+class AsyncUniqFileGridFSBucket(AsyncGridFSBucket):
+    """Async GridFS bucket that replaces the latest file with the same name."""
 
     async def _find_one(self, filename):
-        cursor = self.bucket.find({'filename': filename}).sort('uploadDate', -1).limit(1)
-        docs = []
-        async for doc in cursor:
-            docs.append(doc)
-        return docs
+        cursor = self.find({'filename': filename}).sort('uploadDate', -1).limit(1)
+        async for grid_out in cursor:
+            return grid_out
+        return None
 
-    async def delete(self, file_id):
-        await self.bucket.delete(file_id)
-
-    async def open_upload_stream(self, filename, **kwargs):
-        return await self.bucket.open_upload_stream(filename, **kwargs)
-
-    async def open_upload_stream_with_id(self, file_id, filename, **kwargs):
-        return await self.bucket.open_upload_stream_with_id(file_id, filename, **kwargs)
-
-    async def upload_from_stream(self, filename, source, **kwargs):
-        return await self.bucket.upload_from_stream(filename, source, **kwargs)
-
-    async def upload_from_stream_with_id(self, file_id, filename, source, **kwargs):
-        return await self.bucket.upload_from_stream_with_id(file_id, filename, source, **kwargs)
-
-    async def _create_proxy(self, grid_out: Any, opened=False):
-        fid: ObjectId = getattr(grid_out, '_id')
-        await self.delete(fid)
-        if opened:
-            return partial(self.open_upload_stream_with_id, fid)
-        else:
-            return partial(self.upload_from_stream_with_id, fid)
+    async def _delete_existing(self, filename):
+        grid_out = await self._find_one(filename)
+        if grid_out is not None:
+            await self.delete(grid_out._id)
 
     async def open_save_file(self, filename, **kwargs):
-        docs = await self._find_one(filename)
-        if not docs:
-            return await self.open_upload_stream(filename, **kwargs)
-        else:
-            proxy = await self._create_proxy(docs[0], True)
-            return proxy(filename, **kwargs)
+        """Open a replacement upload stream while retaining the legacy name."""
+        await self._delete_existing(filename)
+        return self.open_upload_stream(filename, **kwargs)
 
-    async def save_file(self, filename, **kwargs):
-        """保存文件"""
-        docs = await self._find_one(filename)
-        if not docs:
-            return self.upload_from_stream(filename, **kwargs)
-        else:
-            proxy = await self._create_proxy(docs[0])
-            return proxy(filename, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        if name in self.bucket.__dict__:
-            return getattr(self.bucket, name)
-        raise AttributeError(f"AsyncUniqFileGridFSBucket has no attribute '{name}'")
+    async def save_file(self, filename, source, **kwargs):
+        """Upload *source*, replacing the most recent file with this name."""
+        await self._delete_existing(filename)
+        return await self.upload_from_stream(filename, source, **kwargs)
 
 
 class MongoClient:
-    """MongoDB客户端，同时提供同步和异步接口"""
+    """MongoDB client exposing matching PyMongo synchronous and asynchronous APIs."""
 
     def __init__(self, uri: str, alias: str = None):
         self.uri = uri
         self.alias = alias if alias is not None else uuid4().hex
         self.sync_client = pymongo.MongoClient(uri)
-
-        # Use the same event loop for all async operations
-        loop = get_running_loop()
-        self.async_client = motor.motor_asyncio.AsyncIOMotorClient(uri, io_loop=loop)
+        self._async_clients: dict[asyncio.AbstractEventLoop, AsyncMongoClient] = {}
 
         self.default_db_name = (
             self.sync_client.get_default_database().name
@@ -181,75 +127,78 @@ class MongoClient:
             else None
         )
 
-        # 配置编解码选项
         self.codec_options = CodecOptions(
             tz_aware=True,
             type_registry=_type_registry,
             tzinfo=pytz.timezone('Asia/Shanghai'),
         )
 
+    def _get_async_client(self) -> AsyncMongoClient:
+        """Return the PyMongo async client bound to the current event loop."""
+        loop = asyncio.get_running_loop()
+        client = self._async_clients.get(loop)
+        if client is None:
+            client = AsyncMongoClient(self.uri)
+            self._async_clients[loop] = client
+        return client
+
+    @property
+    def async_client(self) -> AsyncMongoClient:
+        """Expose PyMongo's native async client for the active event loop."""
+        return self._get_async_client()
+
     def get_database(self, db_name=None) -> Database:
-        """获取同步数据库对象"""
+        """Return a synchronous PyMongo database."""
         if db_name is None:
             return self.sync_client.get_default_database()
         return self.sync_client.get_database(db_name)
 
     def get_async_database(self, db_name=None):
-        """获取异步数据库对象"""
-        # Ensure we have a valid async client
-        self._ensure_valid_async_client()
-
+        """Return a PyMongo async database bound to the active event loop."""
+        client = self.async_client
         if db_name is None:
             if self.default_db_name:
-                return self.async_client[self.default_db_name]
-            return self.async_client.get_default_database()
-        return self.async_client.get_database(db_name)
+                return client[self.default_db_name]
+            return client.get_default_database()
+        return client.get_database(db_name)
 
     def get_collection(self, collection_name: Union[str, Enum], db_name=None) -> Collection:
-        """获取同步集合对象"""
+        """Return a synchronous PyMongo collection with this client's codec options."""
         db = self.get_database(db_name)
         collection_name = enum_name(collection_name)
         return db.get_collection(collection_name, codec_options=self.codec_options)
 
     def get_async_collection(self, collection_name: Union[str, Enum], db_name=None):
-        """获取异步集合对象"""
-        # Ensure we have a valid async client
-        self._ensure_valid_async_client()
-
+        """Return a PyMongo async collection with this client's codec options."""
         db = self.get_async_database(db_name)
         collection_name = enum_name(collection_name)
         return db.get_collection(collection_name, codec_options=self.codec_options)
 
-    def _ensure_valid_async_client(self):
-        """确保异步客户端使用有效的事件循环"""
-        try:
-            # Try to get the loop used by the async client
-            loop = self.async_client.get_io_loop()
-            # Check if the loop is closed
-            if loop.is_closed():
-                # Create a new async client with a valid loop
-                loop = get_running_loop()
-                self.async_client = motor.motor_asyncio.AsyncIOMotorClient(self.uri, io_loop=loop)
-        except (RuntimeError, AttributeError):
-            # If we can't get the loop or there's another issue,
-            # create a new async client with a valid loop
-            loop = get_running_loop()
-            self.async_client = motor.motor_asyncio.AsyncIOMotorClient(self.uri, io_loop=loop)
-
     def get_fs(self, db_name=None) -> GridFS:
-        """获取同步GridFS对象"""
-        db = self.get_database(db_name)
-        return GridFS(db)
+        """Return the legacy synchronous ``GridFS`` facade."""
+        return GridFS(self.get_database(db_name))
+
+    def get_async_fs(self, db_name=None) -> AsyncGridFS:
+        """Return PyMongo's native asynchronous ``GridFS`` facade."""
+        return AsyncGridFS(self.get_async_database(db_name))
 
     def get_fs_bucket(self, db_name=None, bucket_name='fs') -> UniqFileGridFSBucket:
-        """获取同步GridFSBucket对象"""
-        db = self.get_database(db_name)
-        return UniqFileGridFSBucket(db, bucket_name)
+        """Return a synchronous GridFS bucket with replacement-save helpers."""
+        return UniqFileGridFSBucket(self.get_database(db_name), bucket_name)
 
     def get_async_fs_bucket(self, db_name=None, bucket_name='fs') -> AsyncUniqFileGridFSBucket:
-        """获取异步GridFSBucket对象"""
-        db = self.get_async_database(db_name)
-        return AsyncUniqFileGridFSBucket(db, bucket_name)
+        """Return a native-PyMongo asynchronous GridFS bucket with replacement helpers."""
+        return AsyncUniqFileGridFSBucket(self.get_async_database(db_name), bucket_name)
+
+    def _resolve_collection(self, collection, db_name=None):
+        return self.get_collection(collection, db_name) if isinstance(collection, (str, Enum)) else collection
+
+    def _resolve_async_collection(self, collection, db_name=None):
+        return (
+            self.get_async_collection(collection, db_name)
+            if isinstance(collection, (str, Enum))
+            else collection
+        )
 
     # 同步操作方法
     def find(
@@ -424,7 +373,7 @@ class MongoClient:
     # 异步操作方法
     async def async_find(self, collection: Union[str, Enum], query: dict, db_name=None, **kwargs):
         """异步查询多条记录"""
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
         cursor = async_collection.find(query, **kwargs)
         result = []
         async for doc in cursor:
@@ -435,7 +384,7 @@ class MongoClient:
         self, collection: Union[str, Enum], query: dict, db_name=None, **kwargs
     ):
         """异步查询单条记录"""
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
         return await async_collection.find_one(query, **kwargs)
 
     async def async_find_by_id(
@@ -467,7 +416,7 @@ class MongoClient:
         **kwargs,
     ):
         """异步分页查询"""
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
         skip = page_size * (page_no - 1)
         if sort is None:
             sort = [('createdTime', pymongo.DESCENDING)]
@@ -497,7 +446,7 @@ class MongoClient:
         Returns:
             Dict: 包含保存后数据的字典，如果是新插入会包含_id
         """
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
         data_copy = data.copy()  # 创建副本以避免修改原始数据
 
         if '_id' in data_copy:
@@ -556,7 +505,7 @@ class MongoClient:
         Returns:
             Tuple[Dict, Dict]: 包含新文档和旧文档的元组，如果操作失败返回(None, old)
         """
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
         data_copy = data.copy()  # 创建副本以避免修改原始数据
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
@@ -600,7 +549,7 @@ class MongoClient:
         Returns:
             int: 被删除的文档数量
         """
-        async_collection = self.get_async_collection(collection, db_name)
+        async_collection = self._resolve_async_collection(collection, db_name)
 
         query_id = _id if isinstance(_id, ObjectId) else ObjectId(_id)
         try:
@@ -610,10 +559,106 @@ class MongoClient:
             print(f'Error in async_delete: {e}')
             return 0
 
+    def create_index(self, collection, keys, db_name=None, **kwargs):
+        """Create one standard MongoDB index and return its server-assigned name."""
+        return self._resolve_collection(collection, db_name).create_index(keys, **kwargs)
+
+    def create_indexes(self, collection, models, db_name=None, **kwargs):
+        """Create standard indexes from PyMongo ``IndexModel`` instances."""
+        return self._resolve_collection(collection, db_name).create_indexes(models, **kwargs)
+
+    def list_indexes(self, collection, db_name=None, **kwargs):
+        """Return standard index specifications as dictionaries."""
+        return list(self._resolve_collection(collection, db_name).list_indexes(**kwargs))
+
+    def index_information(self, collection, db_name=None, **kwargs):
+        """Return standard indexes keyed by name."""
+        return self._resolve_collection(collection, db_name).index_information(**kwargs)
+
+    def drop_index(self, collection, name_or_spec, db_name=None, **kwargs):
+        """Drop one standard index by name or key specification."""
+        return self._resolve_collection(collection, db_name).drop_index(name_or_spec, **kwargs)
+
+    def drop_indexes(self, collection, db_name=None, **kwargs):
+        """Drop every non-``_id`` standard index."""
+        return self._resolve_collection(collection, db_name).drop_indexes(**kwargs)
+
+    async def async_create_index(self, collection, keys, db_name=None, **kwargs):
+        """Asynchronously create one standard MongoDB index."""
+        return await self._resolve_async_collection(collection, db_name).create_index(keys, **kwargs)
+
+    async def async_create_indexes(self, collection, models, db_name=None, **kwargs):
+        """Asynchronously create standard indexes from ``IndexModel`` instances."""
+        return await self._resolve_async_collection(collection, db_name).create_indexes(models, **kwargs)
+
+    async def async_list_indexes(self, collection, db_name=None, **kwargs):
+        """Asynchronously return standard index specifications."""
+        cursor = await self._resolve_async_collection(collection, db_name).list_indexes(**kwargs)
+        return [index async for index in cursor]
+
+    async def async_index_information(self, collection, db_name=None, **kwargs):
+        """Asynchronously return standard indexes keyed by name."""
+        return await self._resolve_async_collection(collection, db_name).index_information(**kwargs)
+
+    async def async_drop_index(self, collection, name_or_spec, db_name=None, **kwargs):
+        """Asynchronously drop one standard index."""
+        return await self._resolve_async_collection(collection, db_name).drop_index(
+            name_or_spec, **kwargs
+        )
+
+    async def async_drop_indexes(self, collection, db_name=None, **kwargs):
+        """Asynchronously drop every non-``_id`` standard index."""
+        return await self._resolve_async_collection(collection, db_name).drop_indexes(**kwargs)
+
+    def create_search_index(self, collection, model, db_name=None, **kwargs):
+        """Create an Atlas Search or Vector Search index."""
+        return self._resolve_collection(collection, db_name).create_search_index(model, **kwargs)
+
+    def list_search_indexes(self, collection, db_name=None, **kwargs):
+        """Return Atlas Search and Vector Search index status documents."""
+        return list(self._resolve_collection(collection, db_name).list_search_indexes(**kwargs))
+
+    def update_search_index(self, collection, name, definition, db_name=None, **kwargs):
+        """Update an Atlas Search or Vector Search index definition."""
+        return self._resolve_collection(collection, db_name).update_search_index(
+            name, definition, **kwargs
+        )
+
+    def drop_search_index(self, collection, name, db_name=None, **kwargs):
+        """Drop an Atlas Search or Vector Search index."""
+        return self._resolve_collection(collection, db_name).drop_search_index(name, **kwargs)
+
+    async def async_create_search_index(self, collection, model, db_name=None, **kwargs):
+        """Asynchronously create an Atlas Search or Vector Search index."""
+        return await self._resolve_async_collection(collection, db_name).create_search_index(
+            model, **kwargs
+        )
+
+    async def async_list_search_indexes(self, collection, db_name=None, **kwargs):
+        """Asynchronously return Atlas Search and Vector Search index status documents."""
+        cursor = await self._resolve_async_collection(collection, db_name).list_search_indexes(**kwargs)
+        return [index async for index in cursor]
+
+    async def async_update_search_index(self, collection, name, definition, db_name=None, **kwargs):
+        """Asynchronously update an Atlas Search or Vector Search index definition."""
+        return await self._resolve_async_collection(collection, db_name).update_search_index(
+            name, definition, **kwargs
+        )
+
+    async def async_drop_search_index(self, collection, name, db_name=None, **kwargs):
+        """Asynchronously drop an Atlas Search or Vector Search index."""
+        return await self._resolve_async_collection(collection, db_name).drop_search_index(
+            name, **kwargs
+        )
+
+    def _proxy_type_name(self, collection_name, suffix=''):
+        raw_name = f'{self.alias}_{collection_name}{suffix}'
+        return 'Mongo_' + ''.join(char if char.isalnum() else '_' for char in raw_name)
+
     def create_proxy(self, collection_name: str, db_name=None):
         """创建集合代理对象，提供简化的操作方法"""
         proxy_obj = namedtuple(
-            f'{self.alias}_{collection_name}', 'all,find,add,update,replace,delete'
+            self._proxy_type_name(collection_name), 'all,find,add,update,replace,delete'
         )
 
         def all(**kwargs):
@@ -645,10 +690,10 @@ class MongoClient:
 
         return proxy_obj(all, find, add, update, replace, delete)
 
-    def create_async_proxy(self, collection_name: str, db_name=None):
+    async def create_async_proxy(self, collection_name: str, db_name=None):
         """创建异步集合代理对象，提供简化的异步操作方法"""
         proxy_obj = namedtuple(
-            f'{self.alias}_{collection_name}_async',
+            self._proxy_type_name(collection_name, '_async'),
             'all,find,add,update,replace,delete',
         )
 
@@ -726,10 +771,15 @@ class MongoClient:
         db = self.get_database(db_name)
         db.drop()
 
+    async def async_close(self):
+        """Close every PyMongo async client created by this wrapper."""
+        clients = tuple(self._async_clients.values())
+        self._async_clients.clear()
+        await asyncio.gather(*(client.close() for client in clients))
+
     def close(self):
-        """关闭客户端"""
+        """Close the synchronous client; await :meth:`async_close` for async clients."""
         self.sync_client.close()
-        self.async_client.close()
 
     def __str__(self):
         return f"MongoClient(uri='{self.uri}', alias='{self.alias}')"
@@ -782,21 +832,37 @@ def conn(key: Optional[str] = None) -> MongoClient:
 
 
 def get_collection(tag: str, collection: Union[str, Enum], db_name: Optional[str] = None):
-    """获取集合对象（兼容旧API）"""
-    client = get_client(tag)
-    return client.get_collection(collection, db_name)
+    """Return a synchronous collection from a registered client."""
+    return get_client(tag).get_collection(collection, db_name)
+
+
+def get_async_collection(tag: str, collection: Union[str, Enum], db_name: Optional[str] = None):
+    """Return a PyMongo asynchronous collection from a registered client."""
+    return get_client(tag).get_async_collection(collection, db_name)
 
 
 def fs_client(key: Optional[str] = None) -> GridFS:
-    """获取GridFS对象（兼容旧API）"""
-    client = get_client(key)
-    return client.get_fs()
+    """Return the legacy synchronous ``GridFS`` facade."""
+    return get_client(key).get_fs()
 
 
-def fs_bucket(db_name: Optional[str] = None, bucket_name: str = 'fs') -> UniqFileGridFSBucket:
-    """获取GridFSBucket对象（兼容旧API）"""
-    client = get_client(db_name)
-    return client.get_fs_bucket(bucket_name=bucket_name)
+def async_fs_client(key: Optional[str] = None) -> AsyncGridFS:
+    """Return the native PyMongo asynchronous ``GridFS`` facade."""
+    return get_client(key).get_async_fs()
+
+
+def fs_bucket(
+    key: Optional[str] = None, bucket_name: str = 'fs', *, db_name: Optional[str] = None
+) -> UniqFileGridFSBucket:
+    """Return a synchronous GridFS bucket from a registered client."""
+    return get_client(key).get_fs_bucket(db_name, bucket_name)
+
+
+def async_fs_bucket(
+    key: Optional[str] = None, bucket_name: str = 'fs', *, db_name: Optional[str] = None
+) -> AsyncUniqFileGridFSBucket:
+    """Return a PyMongo asynchronous GridFS bucket from a registered client."""
+    return get_client(key).get_async_fs_bucket(db_name, bucket_name)
 
 
 # 兼容旧API的数据操作函数

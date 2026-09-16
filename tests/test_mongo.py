@@ -1,5 +1,6 @@
 import os
 
+import pymongo
 import pytest
 import yaml
 from dotenv import load_dotenv
@@ -141,3 +142,68 @@ async def test_proxy(client):
     finally:
         # 无论测试成功与否，都要清理同步测试数据
         proxy.delete(added_id)
+
+
+def test_sync_indexes_and_gridfs_bucket(client):
+    index_name = client.create_index(
+        TEST_COLLECTION, [('value', pymongo.ASCENDING)], name='value_ascending'
+    )
+    bucket = client.get_fs_bucket(bucket_name=f'{TEST_COLLECTION}_files')
+
+    try:
+        assert index_name in {index['name'] for index in client.list_indexes(TEST_COLLECTION)}
+        file_id = bucket.save_file('sync.txt', b'synchronous payload')
+        assert bucket.open_download_stream(file_id).read() == b'synchronous payload'
+
+        bucket.rename_by_name('sync.txt', 'sync-renamed.txt')
+        assert bucket.open_download_stream_by_name('sync-renamed.txt').read() == b'synchronous payload'
+    finally:
+        if 'file_id' in locals():
+            bucket.delete(file_id)
+        client.drop_index(TEST_COLLECTION, index_name)
+
+
+@pytest.mark.asyncio
+async def test_async_indexes_and_gridfs_bucket(client):
+    index_name = await client.async_create_index(
+        TEST_COLLECTION, [('value', pymongo.DESCENDING)], name='value_descending'
+    )
+    bucket = client.get_async_fs_bucket(bucket_name=f'{TEST_COLLECTION}_async_files')
+
+    try:
+        assert index_name in {index['name'] for index in await client.async_list_indexes(TEST_COLLECTION)}
+        file_id = await bucket.save_file('async.txt', b'asynchronous payload')
+        assert await (await bucket.open_download_stream(file_id)).read() == b'asynchronous payload'
+
+        await bucket.rename_by_name('async.txt', 'async-renamed.txt')
+        assert (
+            await (await bucket.open_download_stream_by_name('async-renamed.txt')).read()
+            == b'asynchronous payload'
+        )
+    finally:
+        if 'file_id' in locals():
+            await bucket.delete(file_id)
+        await client.async_drop_index(TEST_COLLECTION, index_name)
+
+
+@pytest.mark.asyncio
+async def test_async_driver_exposes_native_pymongo_features():
+    client = MongoClient('mongodb://localhost:27017/test')
+
+    try:
+        collection = client.get_async_collection(TEST_COLLECTION)
+        bucket = client.get_async_fs_bucket(bucket_name=f'{TEST_COLLECTION}_native_files')
+        sync_bucket = client.get_fs_bucket(bucket_name=f'{TEST_COLLECTION}_sync_native_files')
+        sync_proxy = client.create_proxy(TEST_COLLECTION)
+        async_proxy = await client.create_async_proxy(TEST_COLLECTION)
+
+        assert isinstance(client.async_client, pymongo.AsyncMongoClient)
+        assert callable(collection.create_search_index)
+        assert callable(collection.list_search_indexes)
+        assert callable(bucket.rename_by_name)
+        assert callable(sync_bucket.rename_by_name)
+        assert callable(sync_proxy.add)
+        assert callable(async_proxy.add)
+    finally:
+        await client.async_close()
+        client.sync_client.close()

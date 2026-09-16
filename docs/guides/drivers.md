@@ -44,20 +44,27 @@ db:
 
 ## MongoDB
 
-一个 `mongo.MongoClient` 同时持有 PyMongo 同步客户端和 Motor 异步客户端。URI 需要含默认数据库名，才能让无 `db_name` 的调用可靠工作。
+`mongo.MongoClient` 同时公开 PyMongo 4.18 的同步 `MongoClient` 和原生 asyncio `AsyncMongoClient`；不再依赖已弃用的 Motor。同步客户端可跨线程使用；异步客户端按事件循环隔离，不能跨事件循环或线程共享。
 
 ```python
 from jcutil.drivers import mongo
 
-mongo.new_client('mongodb://localhost:27017/app', 'app')
+client = mongo.new_client('mongodb://localhost:27017/app', 'app')
 users = mongo.get_collection('app', 'users')
 saved = mongo.save(users, {'name': 'Ada'})
 assert saved['_id']
+
+client.create_index('users', [('name', 1)], unique=True)
+assert 'name_1' in client.index_information('users')
 ```
 
 `save()` 插入时添加 `createTime`、`updateTime` 和 `__v`；带 `_id` 的数据会以 `$set` 更新并增加版本。`find_page()` 默认按 `createdTime` 倒序，并向传入的查询字典加入 `logicDeleted: False`；如果调用方还要使用原查询，请先复制。
 
-异步集合来自 `mongo.get_client('app').get_async_collection('users')`，随后使用 Motor 的 `await collection.find_one(...)` 等 API。
+异步集合来自 `client.get_async_collection('users')`，并直接暴露 PyMongo 的最新异步集合 API，包括 `bulk_write()`、`create_search_index()`、`list_search_indexes()` 和 Atlas Vector Search 管理。包装器还提供同名 `async_create_index()`、`async_list_indexes()`、`async_drop_index()` 以及 Search/Vector Search 的 `async_*_search_index()` 方法。Search/Vector Search 管理由 Atlas 异步执行；用 `list_search_indexes()` 轮询状态。
+
+异步资源应通过 `await client.async_close()` 关闭；`client.close()` 仅关闭同步 PyMongo 客户端。
+
+`get_fs_bucket()` 和 `get_async_fs_bucket()` 返回同步/异步 GridFS bucket，均保留 `open_save_file()`、`save_file()` 的同名文件替换语义，同时公开 PyMongo 的下载、重命名和 `rename_by_name()` API。文件超过 BSON 的 16MB 限制时应使用 GridFS。
 
 ## Redis
 

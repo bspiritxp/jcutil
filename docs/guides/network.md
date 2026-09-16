@@ -1,69 +1,85 @@
 # HTTP、SSE 与 WebSocket
 
-`jcutil.netio` 是围绕 `httpx.AsyncClient`、`aiofiles` 和 `websockets` 的异步轻封装。每个函数都必须在协程中 `await`。
+jcutil 3.0 的 `jcutil.netio` 使用显式生命周期：HTTP 连接池由 `HttpClient` 拥有或由调用方注入；SSE 与 WebSocket 不再隐式重连或注册回调。调用方拥有应用生命周期与重试策略。
 
-## JSON 请求
+## 复用 HTTP 连接池
 
-```python
-from jcutil.netio import get_json, post_json
-
-profile = await get_json('https://api.example/users/42', headers={'Authorization': 'Bearer token'})
-created = await post_json('https://api.example/events', {'type': 'login'}, timeout=5)
-```
-
-`get_json`、`post_json`、`put_json`、`delete_json` 每次调用创建并关闭一个 `httpx.AsyncClient`。请求参数通过 `**kwargs` 传给 httpx；非 2xx 响应会由 `response.raise_for_status()` 抛出 `httpx.HTTPStatusError`。
-
-## 下载和上传
+将一个 `HttpClient` 放在应用的生命周期内，避免每次请求重新建立 TCP/TLS 连接：
 
 ```python
-from pathlib import Path
+from jcutil.netio import HttpClient
 
-from jcutil.netio import download, download_to_file, upload_bytes
 
-stream, content_type = await download('https://example.test/report.csv')
-if stream is not None:
-    Path('report.csv').write_bytes(stream.getvalue())
-
-saved = await download_to_file('https://example.test/report.csv', 'downloads/report.csv')
-assert saved is True
-
-response = await upload_bytes(
-    'https://example.test/files', b'hello', 'greeting.txt', additional_data={'scope': 'demo'}
-)
+async with HttpClient(base_url='https://api.example', timeout=5) as client:
+    profile = await client.get_json('/users/42')
+    created = await client.post_json('/events', {'type': 'login'})
 ```
 
-`download()` 在 HTTP 失败时返回 `(None, None)`；`download_to_file()` 在目标文件存在且未传 `overwrite=True` 时返回 `False`，HTTP 失败时也返回 `False`。它会创建父目录。`upload_file()` 对文件不存在抛出 `FileNotFoundError`，其他 HTTP 失败继续抛异常。
+`get_json`、`post_json`、`put_json`、`delete_json` 与通用的 `request_json()` 都在 HTTP 非 2xx 响应时抛出 `httpx.HTTPStatusError`。它们不会将失败转换为 `None` 或 `False`。
 
-## SSE
-
-使用 async context manager 保证连接关闭。`on(event_name, callback)` 为每个事件名注册一个回调；回调可同步也可异步，接收 `(data, last_event_id)`。
+框架已管理 HTTPX 生命周期时，注入该客户端；jcutil 不会关闭它：
 
 ```python
-from jcutil.netio import EventSourceClient
+import httpx
 
+from jcutil.netio import HttpClient
 
-async def on_message(data, event_id):
-    print(event_id, data)
-
-
-async with EventSourceClient('https://example.test/events') as events:
-    events.on('message', on_message)
-    await events.connect()  # 持续运行，直到外部调用 close()
+external = httpx.AsyncClient(base_url='https://api.example')
+try:
+    async with HttpClient(external) as client:
+        payload = await client.get_json('/health')
+finally:
+    await external.aclose()
 ```
 
-连接失败会等待 `reconnection_time` 后重连；服务器发送 SSE `retry:` 字段会更新该延迟。`connect()` 是长期循环，通常应作为 task 启动并由应用生命周期调用 `close()` 停止。
+## 文件下载和上传
+
+```python
+from jcutil.netio import HttpClient
+
+async with HttpClient() as client:
+    # 返回 Path；目标已存在时默认抛 FileExistsError。
+    path = await client.download_to_file(
+        'https://example.test/report.csv', 'downloads/report.csv', overwrite=True
+    )
+    uploaded = await client.upload_bytes(
+        'https://example.test/files', b'hello', 'greeting.txt', data={'scope': 'demo'}
+    )
+```
+
+`download()` 将内容放入内存并返回 `(BytesIO, content_type)`；`download_to_file()` 流式写入并返回目标 `Path`。`upload_file()` 使用上下文管理器打开文件，因此无论请求成功或失败，文件描述符都会关闭。
+
+## Server-Sent Events
+
+`EventSource` 以异步迭代器输出不可变的 `SseEvent(event, data, id, retry)`；它不重连。将重连和 last-event-id 策略放在应用层，避免库猜测业务语义。
+
+```python
+from jcutil.netio import EventSource, HttpClient
+
+async with HttpClient(headers={'Authorization': 'Bearer token'}) as client:
+    async for event in EventSource(client, 'https://example.test/events').events():
+        print(event.event, event.id, event.data)
+```
 
 ## WebSocket
+
+`WebSocketClient` 使用 `websockets.asyncio` 的当前 API。请求头使用该库的 `additional_headers`，而不是已移除的 `extra_headers`。
 
 ```python
 from jcutil.netio import WebSocketClient
 
-async with WebSocketClient('wss://example.test/socket') as ws:
-    ws.on('message', lambda payload, kind: print(kind, payload))
-    await ws.send_json({'op': 'ping'})
-    reply = await ws.receive()
+async with WebSocketClient(
+    'wss://example.test/socket', additional_headers={'Authorization': 'Bearer token'}
+) as socket:
+    await socket.send_json({'op': 'ping'})
+    reply = await socket.receive()
 ```
 
-支持 `message`、`connect`、`disconnect` 和 `error` 回调。`send_text()`、`send_json()`、`send_bytes()`、`receive()`、`listen()` 都要求已连接，否则抛 `ConnectionError`。`listen()` 会持续读取直至连接关闭，适合放在单独 task 中。
+需要持续读取时迭代 `socket.messages()`；连接关闭或网络错误由调用方捕获并决定是否重试：
 
-更多签名见[安全、缓存与网络 API](../reference/security-cache-network.md)。
+```python
+async for message in socket.messages():
+    process(message)
+```
+
+完整签名见[安全、缓存与网络 API](../reference/security-cache-network.md)。

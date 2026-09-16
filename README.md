@@ -4,6 +4,8 @@
 
 通用Python实用工具库，包含控制台彩色输出、数据库驱动、缓存工具等多种功能。
 
+> jcutil 3.0 requires Python 3.12 or newer.
+
 ## 目录结构
 
 ```
@@ -225,63 +227,37 @@ print(ErrorChalk("错误信息"))
 `redis`|Redis驱动（支持异步操作）
 `mq`|Kafka驱动
 
-#### 配置示例
+#### v3 数据库配置
+
+`db` 标签现在显式声明同步或异步模式；不要从 URL 文本推断模式：
 
 ```yaml
 db:
-  app: oracle://user:pwd@master.oradb.local/jstd?encoding=utf-8
-  bsit: mysql+pymysql://app:pwd@master.mysql.local:3306/?charset=utf8mb
-  jp: postgresql://app:pwd@master.psl.local:5432/linkedalliance
-  ym: oracle://app:pwd@other.oradb.local:1521/orcl2?encoding=utf-8
-mongo:
-  app: mongodb://app:pwd@mongo1.local:27017/app
-  pump: mongodb://pump:pwd@mongo1.local:27017,mongo2.local:27017,mongo3.local:27017/pump?replicaSet=zxjr
-redis:
-  app: cluster://redis1.local:6379,redis3.local:6379,redis5.local:6379
-  cache: redis://10.116.132.74:6379
-mq:
-  app: 10.116.132.110:9092,10.116.132.112:9092,10.116.132.108:9092
+  app:
+    url: postgresql+psycopg://user:password@db.example/app
+    mode: sync
+    pool_pre_ping: true
+  analytics:
+    url: postgresql+asyncpg://user:password@db.example/analytics
+    mode: async
 ```
 
-#### 使用示例
+#### v3 使用示例
 
 ```python
-import yaml
-from jcutil.drivers import smart_load, db, mongo, redis, mq
+from sqlalchemy import text
 
-# 读取配置文件
-with open('config.yaml', 'r') as f:
-    conf = yaml.safe_load(f)
-    
-# 自动加载配置并注册驱动
-smart_load(conf)
+from jcutil.drivers import db
 
-# 使用别名为"app"的Oracle数据库
-with db.connect('app') as conn:
-    result = conn.execute("SELECT * FROM users")
-    for row in result:
-        print(row)
-
-# 注册新的内存SQLite数据库并使用
-db.new_client('sqlite:///:memory:', 'memCache')
-with db.connect('memCache') as conn:
-    conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
-    conn.execute("INSERT INTO test VALUES (1, 'test')")
-
-# MongoDB操作示例
-user_coll = mongo.get_collection('app', 'users')
-users = user_coll.find({'active': True})
-for user in users:
-    print(user['name'])
-
-# Redis操作示例
-redis_client = redis.connect('app')
-redis_client.set('key', 'value')
-print(redis_client.get('key'))
-
-# Kafka消息发送示例
-mq.send('app', 'user-events', '{"event": "user_login", "user_id": 123}')
+db.register_sync('app', 'sqlite:///:memory:')
+try:
+    with db.connect('app') as connection:
+        connection.execute(text('SELECT 1'))
+finally:
+    db.dispose_sync('app')
 ```
+
+异步引擎使用 `db.register_async()` 和 `async with db.async_connect(tag)`。完整的驱动、HTTP、SSE 和 WebSocket 使用手册见 [`docs/`](docs/index.md)。
 
 ## 3. Core实用函数API
 

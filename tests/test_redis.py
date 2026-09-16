@@ -6,53 +6,38 @@ import pytest
 import pytest_asyncio
 import yaml
 
-from jcutil.drivers.redis import Lock, SpinLock, load, new_client
+from jcutil.drivers.redis import Lock, SpinLock, get_client, new_client
 
 
 @pytest_asyncio.fixture
 async def setup_redis():
-    """设置Redis测试连接"""
-    import redis
+    """Yield an async Redis client or skip when the configured service is unavailable."""
+    redis_uri = "redis://127.0.0.1:6379"
+    if os.path.exists("tests/config.yaml"):
+        with open("tests/config.yaml", "r") as file:
+            conf = yaml.safe_load(file)
+            redis_uri = conf.get("redis", {}).get("test", redis_uri)
 
-    # 首先尝试同步连接测试Redis是否可用
     try:
-        # 如果存在测试配置文件，则使用配置文件
-        redis_uri = "redis://127.0.0.1:6379"
-        if os.path.exists("tests/config.yaml"):
-            with open("tests/config.yaml", "r") as f:
-                conf = yaml.safe_load(f)
-                if "redis" in conf and "test" in conf["redis"]:
-                    redis_uri = conf["redis"]["test"]
-
-        # 使用同步客户端测试连接
-        client = redis.from_url(redis_uri)
-        client.ping()  # 测试连接是否正常
-        client.close()  # 关闭同步连接
-
-        # Redis可用,创建异步连接
-        if os.path.exists("tests/config.yaml"):
-            with open("tests/config.yaml", "r") as f:
-                conf = yaml.safe_load(f)
-                if "redis" in conf:
-                    # 处理load函数返回的协程
-                    load_result = load(conf["redis"])
-                    if asyncio.iscoroutine(load_result):
-                        await load_result
-                    return
-
-        # 否则使用默认连接
         await new_client(redis_uri, "test")
-
-    except Exception as e:
-        logging.error("Failed to connect to Redis: %s", e)
+        client = get_client("test")
+        assert client is not None
+        await client.ping()
+    except Exception as error:
+        logging.error("Failed to connect to Redis: %s", error)
         pytest.skip("Redis connection failed")
+
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_redis_basic_operations(setup_redis):
     """测试Redis基本操作"""
     # 获取连接
-    client = setup_redis()
+    client = setup_redis
 
     # 测试设置和获取值
     test_key = "test_key"
@@ -81,7 +66,7 @@ async def test_redis_basic_operations(setup_redis):
 @pytest.mark.asyncio
 async def test_redis_expire(setup_redis):
     """测试Redis过期时间设置"""
-    client = setup_redis()
+    client = setup_redis
     test_key = "expire_key"
 
     # 设置带过期时间的键
@@ -100,7 +85,6 @@ async def test_redis_expire(setup_redis):
 @pytest.mark.asyncio
 async def test_spin_lock(setup_redis):
     """测试SpinLock功能"""
-    setup_redis()
     lock_key = "test_lock"
 
     # 测试自动获取和释放锁

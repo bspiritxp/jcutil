@@ -7,12 +7,12 @@ license = {text = "MIT"}
 authors = [
     { name = "Jochen.he", email = "thjl@hotmail.com" }
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 dependencies = [
     "aiofiles>=24.1.0",
     "apscheduler",
     "colorama",
-    "httpx>=0.24.0",
+    "httpx>=0.28",
     "jcramda>=1.0.6",
     "joblib",
     "motor",
@@ -25,7 +25,7 @@ dependencies = [
     "python-dotenv",
     "pyyaml",
     "redis",
-    "websockets>=10.0",
+    "websockets>=14",
 ]
 
 
@@ -39,6 +39,8 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff",
+    "aiosqlite",
+    "sqlalchemy[asyncio]>=2.0",
 ]
 
 docs = [

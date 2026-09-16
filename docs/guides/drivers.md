@@ -1,6 +1,6 @@
 # 标签化驱动
 
-`jcutil.drivers` 以进程内注册表保存命名客户端。配置键与驱动模块名必须一致：`db`、`mongo`、`redis`、`mq`。`smart_load(conf)` 逐键加载 `jcutil.drivers.<key>` 并调用其 `load()`。
+`jcutil.drivers` 以进程内注册表保存命名客户端。配置键必须匹配驱动模块名：`db`、`mongo`、`redis`、`mq`。`smart_load(conf)` 逐键导入 `jcutil.drivers.<key>` 并调用该模块的 `load()`。
 
 ```python
 from jcutil.drivers import smart_load
@@ -11,37 +11,36 @@ smart_load({
 })
 ```
 
-未知键或加载模块失败会被记录为 debug；数据库单个引擎连接失败会记录 warning。调用 `smart_load()` 成功并不代表所有资源均可用，应用启动检查必须查询各自注册表或做健康检查。
+标签只在当前 Python 进程有效。应用启动时加载并检查资源；应用关闭时由相应模块释放需要关闭的资源。
 
 ## 返回/缺失语义
 
 | 驱动 | 取得客户端 | 未找到标签 |
 | --- | --- | --- |
-| `db` | `db.get_client()` / `db.connect()` | `RuntimeError` |
+| `db` | `db.get_sync_engine()` / `db.get_async_engine()` | `KeyError` |
 | `mongo` | `mongo.get_client()` / `mongo.get_collection()` | `KeyError` |
 | `redis` | `redis.connect()` | `None` |
 | `mq` | `mq.send()` | `AssertionError` |
 
 不要写一个假定这些行为相同的通用访问层。
 
-## SQLAlchemy
+## SQLAlchemy 2.x
 
-`drivers.db` 在未安装 SQLAlchemy 时可以导入，但创建引擎会失败。`load()` 接受 `{tag: url}`；`new_client()` 可用 `url=` 或自定义的 `create_engine=` 注册。
+从 jcutil 3.0 开始，DB 配置显式区分同步与异步引擎，且不再从 URL 文本猜测模式：
 
-```python
-from sqlalchemy import text
-
-from jcutil.drivers import db
-
-# URL 必须由部署环境提供；示例不包含凭据。
-db.load({'app': 'postgresql://user:password@db.example/app'})
-with db.connect('app') as connection:
-    result = connection.execute(text('SELECT 1'))
-
-db.close_all_engines()
+```yaml
+db:
+  app:
+    url: postgresql+psycopg://user:password@db.example/app
+    mode: sync
+    pool_pre_ping: true
+  analytics:
+    url: postgresql+asyncpg://user:password@db.example/analytics
+    mode: async
+    pool_pre_ping: true
 ```
 
-`connect()` 只适用于同步引擎。异步 SQLAlchemy 引擎应通过 `get_client()` 取得后，使用 SQLAlchemy 的异步连接 API。
+`db.load()` 会把每个标签的 `url` 和 `mode` 取出，并将其他选项原样交给 SQLAlchemy。无效配置、重复标签和创建失败都会立即抛出异常；不会记录 warning 后继续运行。同步使用 `db.connect(tag)`，异步使用 `async with db.async_connect(tag)`。既有同步调用方可暂时使用[数据库入门](../getting-started.md)中的旧函数兼容层，但新代码应直接调用 v3 API。
 
 ## MongoDB
 
@@ -58,7 +57,7 @@ assert saved['_id']
 
 `save()` 插入时添加 `createTime`、`updateTime` 和 `__v`；带 `_id` 的数据会以 `$set` 更新并增加版本。`find_page()` 默认按 `createdTime` 倒序，并向传入的查询字典加入 `logicDeleted: False`；如果调用方还要使用原查询，请先复制。
 
-异步集合来自 `mongo.get_client('app').get_async_collection('users')`，随后使用 Motor 的 `await collection.find_one(...)` 等 API。不要在一个已运行的事件循环中使用 Redis `load()` 的同步启动路径。
+异步集合来自 `mongo.get_client('app').get_async_collection('users')`，随后使用 Motor 的 `await collection.find_one(...)` 等 API。
 
 ## Redis
 

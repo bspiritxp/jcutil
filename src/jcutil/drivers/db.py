@@ -1,171 +1,213 @@
-"""
-jcutil.drivers.db
-数据库连接管理
+"""Tagged SQLAlchemy 2.x engine registry.
 
- - 创建数据库连接
- - 获取数据库连接
-@package jcutil.drivers.db
-@author: Jochen.He
+The registry owns engines, not transactions. Register an engine at application startup,
+open connections at the call site, and dispose engines at application shutdown.
 """
-import logging
-from importlib import import_module
-from typing import Any, Callable, Optional, Union
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
+from typing import Any, Literal
 
 try:
-    from sqlalchemy.engine import Engine  # pyright: ignore [reportMissingImports]
-    from sqlalchemy.ext.asyncio import AsyncEngine  # pyright: ignore [reportMissingImports]
+    from sqlalchemy import create_engine
+    from sqlalchemy.engine import Connection, Engine
+    from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
     SQLALCHEMY_AVAILABLE = True
 except ImportError:
     SQLALCHEMY_AVAILABLE = False
-    Engine = Any
-    AsyncEngine = Any
+    Connection = Engine = AsyncConnection = AsyncEngine = Any
 
-from jcramda import loc
-
-__all__ = [
+__all__ = (
+    'SQLALCHEMY_AVAILABLE',
+    'register_sync',
+    'register_async',
+    'get_sync_engine',
+    'get_async_engine',
     'connect',
-    'conn',
+    'async_connect',
+    'load',
+    'instances',
+    'dispose_sync',
+    'dispose_async',
     'init_engine',
     'new_client',
     'get_client',
-    'load',
-    'instances',
+    'conn',
     'close_engine',
     'close_all_engines',
-]
+)
 
-__engines = dict()
+_sync_engines: dict[str, Engine] = {}
+_async_engines: dict[str, AsyncEngine] = {}
 
 
-def init_engine(tag: str, *args, create_engine: Optional[Callable] = None, **kwargs: Any) -> Engine:  # pyright: ignore [reportInvalidTypeForm]
-    """Initialize a database engine
-
-    :param tag: identifier for the connection engine
-    :param create_engine: function to create database connection engine
-    :param kwargs: database connection configuration
-
-    **Options**
-     * schema: default is 'oracle', supports ['oracle', 'mysql', 'sqlite', 'postgres', etc...]
-     * user: database connection username
-     * password: database connection password
-     * dsn: database host and port dsn string
-     * url: database connection url, e.g.: "oracle://username:password@10.0.0.5:1521/sid?encoding=utf-8"
-
-    :return: configured database engine
-    """
-    schema = kwargs.get('schema', 'oracle')
-    if create_engine is None:
-        sqlmodule = import_module('sqlalchemy')
-        url = (
-            '{schema}://{user}:{password}@{dsn}?encoding=utf-8'.format(
-                schema=schema,
-                user=kwargs['user'],
-                password=kwargs['password'],
-                dsn=kwargs['dsn'],
-            )
-            if 'url' not in kwargs
-            else kwargs.pop('url')
+def _require_sqlalchemy() -> None:
+    if not SQLALCHEMY_AVAILABLE:
+        raise ImportError(
+            'jcutil.drivers.db requires SQLAlchemy. Install it with `pip install sqlalchemy`.'
         )
-        if 'async' in url:
-            current_engine = sqlmodule.ext.asyncio.create_async_engine(url, pool_size=20, **kwargs)
-        else:
-            current_engine = sqlmodule.create_engine(url, pool_size=20, **kwargs)
-    else:
-        current_engine = create_engine(*args, **kwargs)
-    __engines[tag] = current_engine
-    return current_engine
 
 
-def new_client(
-    tag: str, *args: Any, create_engine: Optional[Callable] = None, **kwargs: Any
-) -> Engine | AsyncEngine:  # pyright: ignore [reportInvalidTypeForm]
-    """Create and register a new database client
+def _ensure_unused(tag: str) -> None:
+    if tag in _sync_engines or tag in _async_engines:
+        raise ValueError(f"Database tag '{tag}' is already registered")
 
-    :param tag: identifier for the client
-    :param create_engine: engine creation function
-    :param kwargs: engine configuration
-    :return: created database engine
+
+def register_sync(tag: str, url: str, **engine_options: Any) -> Engine:
+    """Create and register a synchronous SQLAlchemy engine.
+
+    ``url`` must name a synchronous dialect and driver. Pool and dialect options are
+    passed unchanged to :func:`sqlalchemy.create_engine`.
     """
-    return init_engine(tag, *args, create_engine=create_engine, **kwargs)
+    _require_sqlalchemy()
+    _ensure_unused(tag)
+    engine = create_engine(url, **engine_options)
+    _sync_engines[tag] = engine
+    return engine
 
-def get_client(name: Union[str, int] = 0) -> Engine | AsyncEngine:  # pyright: ignore [reportInvalidTypeForm]
-    """Get database engine by name or index
 
-    :param name: engine identifier or index
-    :return: database engine
-    :raises RuntimeError: if no engines available or engine not found
+def register_async(tag: str, url: str, **engine_options: Any) -> AsyncEngine:
+    """Create and register an asynchronous SQLAlchemy engine.
+
+    ``url`` must name an asyncio-capable dialect and driver, for example
+    ``postgresql+asyncpg://`` or ``sqlite+aiosqlite://``.
     """
-    if len(__engines) > 0:
-        try:
-            return loc(name, __engines)
-        except (KeyError, IndexError) as err:
-            raise RuntimeError(f"Database engine '{name}' not found") from err
-    raise RuntimeError('No database engines available')
+    _require_sqlalchemy()
+    _ensure_unused(tag)
+    engine = create_async_engine(url, **engine_options)
+    _async_engines[tag] = engine
+    return engine
 
 
-def connect(n: Union[str, int] = 0):
-    """Get database connection
-
-    :param n: engine identifier or index
-    :return: database connection
-    """
-    engine = get_client(n)
-    if hasattr(engine, 'connect'):
-        return engine.connect()
-    else:
-        raise RuntimeError(f'Engine {n} does not support connection')
-
-
-def load(conf: dict[str, str]) -> None:
-    """
-    一次性读取配置文件，生成数据库链接
-    配置文件格式：dict(dbname="{dburl}")
-    ```
-    {
-      "db1": "mysql://username:password@127.0.0.1:3306/dbname?encoding=utf8mb",
-      "myoracle": "oracle://...",
-    }
-    ```
-    @param conf: Dict[str, str]
-    """
-    if conf and len(conf) > 0:
-        for key in conf:
-            try:
-                init_engine(key, url=conf[key])
-            except Exception as err:
-                logging.warning(f'load database [{key}] failed: {err}')
-            # print(f'database [{key}] connected')
-
-
-conn = connect
-
-
-def instances() -> list[str]:
-    """Get all registered engine identifiers
-
-    :return: list of engine names
-    """
-    return [*__engines.keys()]
-
-
-def close_engine(tag: Union[str, int]) -> None:
-    """Close and remove a specific database engine
-
-    :param tag: engine identifier or index
-    """
+def get_sync_engine(tag: str) -> Engine:
+    """Return the synchronous engine registered under ``tag``."""
     try:
-        engine = get_client(tag)
-        if hasattr(engine, 'dispose'):
-            engine.dispose()
-        if isinstance(tag, int):
-            tag = instances()[tag]
-        __engines.pop(tag, None)
-    except Exception as err:
-        logging.warning(f'Failed to close engine {tag}: {err}')
+        return _sync_engines[tag]
+    except KeyError as error:
+        if tag in _async_engines:
+            raise TypeError(f"Database tag '{tag}' is asynchronous; use async_connect()") from error
+        raise KeyError(f"Synchronous database tag '{tag}' is not registered") from error
+
+
+def get_async_engine(tag: str) -> AsyncEngine:
+    """Return the asynchronous engine registered under ``tag``."""
+    try:
+        return _async_engines[tag]
+    except KeyError as error:
+        if tag in _sync_engines:
+            raise TypeError(f"Database tag '{tag}' is synchronous; use connect()") from error
+        raise KeyError(f"Asynchronous database tag '{tag}' is not registered") from error
+
+
+def connect(tag: str) -> Connection:
+    """Open a synchronous connection for ``with`` usage.
+
+    The caller owns transaction handling and closes the returned connection by leaving
+    its context manager.
+    """
+    return get_sync_engine(tag).connect()
+
+
+@asynccontextmanager
+async def async_connect(tag: str) -> AsyncIterator[AsyncConnection]:
+    """Yield an asynchronous connection for ``async with`` usage."""
+    async with get_async_engine(tag).connect() as connection:
+        yield connection
+
+
+def load(conf: Mapping[str, Mapping[str, Any]]) -> None:
+    """Register engines from tagged configuration.
+
+    Each tag maps to a mapping containing ``url`` and a required ``mode`` of ``sync``
+    or ``async``. Other keys are passed to SQLAlchemy's engine constructor.
+    """
+    for tag, settings in conf.items():
+        if not isinstance(settings, Mapping):
+            raise TypeError(f"Database configuration for '{tag}' must be a mapping")
+
+        try:
+            url = settings['url']
+            mode: Literal['sync', 'async'] = settings['mode']
+        except KeyError as error:
+            raise ValueError(
+                f"Database configuration for '{tag}' requires 'url' and 'mode'"
+            ) from error
+
+        if not isinstance(url, str):
+            raise TypeError(f"Database URL for '{tag}' must be a string")
+        if mode not in ('sync', 'async'):
+            raise ValueError(f"Database mode for '{tag}' must be 'sync' or 'async'")
+
+        engine_options = {key: value for key, value in settings.items() if key not in {'url', 'mode'}}
+        if mode == 'sync':
+            register_sync(tag, url, **engine_options)
+        else:
+            register_async(tag, url, **engine_options)
+
+
+def instances() -> tuple[str, ...]:
+    """Return all registered tags in registration order."""
+    return tuple((*_sync_engines, *_async_engines))
+
+
+def dispose_sync(tag: str) -> None:
+    """Dispose and unregister a synchronous engine."""
+    engine = get_sync_engine(tag)
+    engine.dispose()
+    del _sync_engines[tag]
+
+
+async def dispose_async(tag: str) -> None:
+    """Dispose and unregister an asynchronous engine."""
+    engine = get_async_engine(tag)
+    await engine.dispose()
+    del _async_engines[tag]
+
+
+def init_engine(tag: str, url: str, **engine_options: Any) -> Engine:
+    """Compatibility name for :func:`register_sync`.
+
+    This adapter keeps the historic synchronous entry point while delegating all
+    registration and validation to the v3 registry.
+    """
+    return register_sync(tag, url, **engine_options)
+
+
+new_client = init_engine
+
+
+def _compat_tag(tag: str | int) -> str:
+    if isinstance(tag, str):
+        return tag
+    try:
+        return instances()[tag]
+    except IndexError as error:
+        raise KeyError(f'Database registry index {tag} is not registered') from error
+
+
+def get_client(name: str | int = 0) -> Engine:
+    """Compatibility name for :func:`get_sync_engine`.
+
+    Integer registry indices remain supported only by this compatibility function;
+    new code must use explicit tags.
+    """
+    return get_sync_engine(_compat_tag(name))
+
+
+def conn(name: str | int = 0) -> Connection:
+    """Compatibility name for :func:`connect`."""
+    return connect(_compat_tag(name))
+
+
+def close_engine(tag: str | int) -> None:
+    """Compatibility name for :func:`dispose_sync`."""
+    dispose_sync(_compat_tag(tag))
 
 
 def close_all_engines() -> None:
-    """Close and remove all database engines"""
-    for tag in list(instances()):
-        close_engine(tag)
+    """Dispose every registered synchronous engine through :func:`dispose_sync`."""
+    for tag in tuple(_sync_engines):
+        dispose_sync(tag)

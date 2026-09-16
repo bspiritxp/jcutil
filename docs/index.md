@@ -24,6 +24,8 @@
 pip install jcutil
 ```
 
+jcutil 3.0 要求 Python 3.12 或更高版本。
+
 项目声明的基础依赖会随安装一并解析。下面两类环境仍有额外前置条件：
 
 - `drivers.db` 只有检测到 SQLAlchemy 后才创建数据库引擎：`pip install sqlalchemy`。

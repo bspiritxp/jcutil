@@ -1,54 +1,84 @@
-# 入门：注册并使用一个驱动
+# 入门：注册同步和异步数据库
 
-这一页演示本库最常见的服务端使用方式：使用标签注册资源，再通过标签取得它。示例使用 SQLite 内存库，因此不需要部署数据库服务。
+`jcutil.drivers.db` 是 SQLAlchemy 2.x 的标签化引擎注册表。它只管理引擎的注册与释放；连接、事务和 SQL 仍由调用方显式拥有。
 
 ## 前提
 
+jcutil 3.0 要求 Python 3.12+。安装 SQLAlchemy 的 asyncio extra；异步 SQLite 示例还需要 `aiosqlite`：
+
 ```bash
-pip install jcutil sqlalchemy
+pip install 'sqlalchemy[asyncio]' aiosqlite
 ```
 
-## 1. 注册连接
-
-`drivers.db` 维护进程内的引擎注册表。标签是调用方定义的稳定名称；不要在业务代码中散落连接 URL。
-
-```python
-from sqlalchemy import create_engine
-
-from jcutil.drivers import db
-
-engine = db.new_client('demo', create_engine=create_engine, url='sqlite:///:memory:')
-assert db.instances() == ['demo']
-```
-
-`new_client()` 的第一个参数始终是标签。直接传入 `create_engine` 时，剩余参数会交给该函数；此写法避免依赖 `db.init_engine()` 的 Oracle 风格默认参数。
-
-## 2. 取得并使用资源
+## 同步引擎
 
 ```python
 from sqlalchemy import text
 
-with db.connect('demo') as connection:
+from jcutil.drivers import db
+
+# 应用启动时注册。
+db.register_sync('app', 'sqlite:///:memory:')
+
+# 每个调用点显式管理连接与事务。
+with db.connect('app') as connection:
     connection.execute(text('CREATE TABLE greeting (message TEXT)'))
     connection.execute(text("INSERT INTO greeting VALUES ('hello jcutil')"))
-    row = connection.execute(text('SELECT message FROM greeting')).one()
+    assert connection.scalar(text('SELECT message FROM greeting')) == 'hello jcutil'
 
-assert row.message == 'hello jcutil'
+# 应用停止时释放连接池。
+db.dispose_sync('app')
 ```
 
-`db.connect(tag)` 返回引擎的 `connect()` 结果。它没有隐式提交事务；实际应用应遵循所使用 SQLAlchemy 引擎与事务 API 的规则。
+## 异步引擎
 
-## 3. 关闭注册表资源
+异步 URL 必须选择 SQLAlchemy 支持的异步 driver，例如 `sqlite+aiosqlite` 或 `postgresql+asyncpg`。
 
 ```python
-db.close_engine('demo')
-assert db.instances() == []
+from sqlalchemy import text
+
+from jcutil.drivers import db
+
+
+db.register_async('analytics', 'sqlite+aiosqlite:///:memory:')
+
+async with db.async_connect('analytics') as connection:
+    await connection.execute(text('SELECT 1'))
+
+await db.dispose_async('analytics')
 ```
 
-长生命周期进程通常在应用退出时关闭引擎。测试或一次性脚本必须主动清理，避免同一解释器中的后续调用使用旧注册项。
+同步标签调用 `async_connect()`（或异步标签调用 `connect()`）会抛出 `TypeError`。标签不存在会抛出 `KeyError`；不再接受按注册顺序取第一个引擎的隐式行为。
 
-## 下一步
+## 旧同步函数的兼容层
 
-- 用 YAML 一次注册多类资源：[标签化驱动](guides/drivers.md)。
-- 处理 MongoDB 的同步与异步集合：[标签化驱动](guides/drivers.md#mongodb)。
-- 查询完整签名：[驱动 API 参考](reference/drivers.md)。
+为帮助既有调用方迁移，旧同步函数继续存在，但全部委托给 v3 注册表：
+
+| 旧函数 | v3 等价调用 |
+| --- | --- |
+| `init_engine(tag, url, **options)` | `register_sync(tag, url, **options)` |
+| `new_client(tag, url, **options)` | `register_sync(tag, url, **options)` |
+| `get_client(tag)` | `get_sync_engine(tag)` |
+| `conn(tag)` | `connect(tag)` |
+| `close_engine(tag)` | `dispose_sync(tag)` |
+| `close_all_engines()` | 对每个同步标签调用 `dispose_sync()` |
+
+兼容函数仍接受旧的整数注册表索引（例如 `get_client(0)`），但新代码必须使用明确的字符串标签。它们只处理**同步**引擎；异步调用统一使用 `register_async()`、`async_connect()` 与 `dispose_async()`。
+
+## 配置加载
+
+`smart_load()` 仍会调用 `db.load()`，但 db 配置现在要求每个标签显式指定 `url` 和 `mode`：
+
+```yaml
+db:
+  app:
+    url: postgresql+psycopg://user:password@db.example/app
+    mode: sync
+    pool_pre_ping: true
+  analytics:
+    url: postgresql+asyncpg://user:password@db.example/analytics
+    mode: async
+    pool_pre_ping: true
+```
+
+除 `url` 与 `mode` 外的字段会直接传给 SQLAlchemy 的对应引擎构造函数。完整签名见[驱动 API 参考](reference/drivers.md)。

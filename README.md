@@ -17,8 +17,7 @@ jcutil/
 │   ├── drivers/          # 数据库驱动工具
 │   │   ├── db.py         # 关系型数据库驱动
 │   │   ├── mongo.py      # MongoDB驱动
-│   │   ├── redis.py      # Redis驱动
-│   │   └── mq.py         # 消息队列驱动(Kafka)
+│   │   └── redis.py      # Redis驱动
 │   ├── consul.py         # Consul配置工具
 │   ├── crypto.py         # 加密解密工具
 │   ├── data.py           # 缓存工具
@@ -40,7 +39,7 @@ jcutil/
 -|-
 `chalk`|粉笔工具，用于控制台输出带颜色文本
 `core`|常用工具函数集合(JSON处理、异步执行等)
-`drivers`|数据库及消息队列连接工具
+`drivers`|数据库连接与缓存客户端工具
 `consul`|Consul服务发现与配置工具
 `crypto`|加密解密工具，支持AES/RSA/哈希等多种算法
 `data`|函数结果缓存工具
@@ -140,8 +139,7 @@ print(f'任务: {render("已完成", fg=Color.GREEN, mode=ColorMode.NEVER)}')
 -|-
 `db`|关系型数据库驱动; 推荐安装`sqlalchemy`
 `mongodb`|MongoDB驱动（同时支持同步和异步操作）
-`redis`|Redis驱动（支持异步操作）
-`mq`|Kafka驱动
+`redis`|Redis驱动（支持同步和异步操作）
 
 #### v3 数据库配置
 
@@ -192,7 +190,7 @@ finally:
 `obj_dumps`|`(Any) -> str`|序列化对象为一个base64字符串
 `obj_loads`|`(str) -> Any`|反序列化base64字符串到对象
 `map_async`|`(Callable, Iterable, int) -> List`|异步非阻塞Map函数(Event Loop版)
-`fix_document`|`(dict, dict) -> dict`|按照类型配置修复dict中的值（常用于kafka中接受json字符串后进行值修复）
+`fix_document`|`(dict, dict) -> dict`|按照类型配置修复dict中的值（常用于JSON文档清洗）
 `to_obj`|-|使用安全的类型转换字符串为Json
 `from_json_file`|`(Pathlike) -> Any`|使用安全的类型读取Json文件
 `to_json`|-|使用安全的类型转换对象为字符串

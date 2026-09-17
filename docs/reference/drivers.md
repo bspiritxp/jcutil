@@ -18,6 +18,3 @@
 
 ::: jcutil.drivers.redis
 
-## `jcutil.drivers.mq`
-
-::: jcutil.drivers.mq

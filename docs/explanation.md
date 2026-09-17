@@ -34,6 +34,6 @@ db.connect(tag) / mongo.get_client(tag) / redis.connect(tag)
 - `Where` 的 HTML escaping 不是 SQL escaping，更不是参数化查询。
 - pickle 反序列化 (`obj_loads`、`redis_cache`) 可执行构造对象的代码；数据源必须可信。
 - 密码需要慢哈希（默认 Argon2），不能使用 `crypto` 的 AES、MD5、SHA 或可逆密文替代。
-- 密钥、Consul token、数据库 URI 与 Kafka endpoint 由部署环境注入；文档示例只使用占位值。
+- 密钥、Consul token、数据库 URI 与外部服务 endpoint 由部署环境注入；文档示例只使用占位值。Kafka 不再由 jcutil 提供驱动封装，应用必须直接拥有自己的 Kafka 客户端、配置和生命周期。
 
 这些约束是公共使用契约。任何改变应同步更新使用指南、API docstring 和对应测试。

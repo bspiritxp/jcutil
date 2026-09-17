@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 彩色终端文本 | `jcutil.chalk` | [核心与终端 API](reference/core-and-chalk.md) |
 | JSON、对象序列化、线程池辅助函数 | `jcutil.core` | [核心、JSON 与并发](guides/core.md) |
-| SQLAlchemy、MongoDB、Redis、Kafka 的命名连接 | `jcutil.drivers` | [标签化驱动](guides/drivers.md) |
+| SQLAlchemy、MongoDB、Redis 的命名连接 | `jcutil.drivers` | [标签化驱动](guides/drivers.md) |
 | 密码哈希、令牌、AES、RSA、摘要 | `jcutil.crypto_utils`、`jcutil.crypto` | [密码与密码学](guides/security.md) |
 | 异步 HTTP、文件传输、SSE、WebSocket | `jcutil.netio` | [HTTP、SSE 与 WebSocket](guides/network.md) |
 | 本地/Redis 缓存或异步写入文件 | `jcutil.data` | [缓存与持久化](guides/cache.md) |
@@ -31,7 +31,7 @@ jcutil 3.0 要求 Python 3.12 或更高版本。
 - `drivers.db` 只有检测到 SQLAlchemy 后才创建数据库引擎：`pip install sqlalchemy`。
 - 默认的密码哈希方案是 Argon2；运行密码哈希前安装后端：`pip install argon2-cffi`。如选择 BCrypt，还需要 `bcrypt`。
 
-MongoDB、Redis、Kafka、Consul 与 APScheduler 都是客户端封装；相应的服务端必须由应用自行提供。
+MongoDB、Redis、Consul 与 APScheduler 都是客户端封装；相应的服务端必须由应用自行提供。Kafka 不再由 jcutil 封装；使用 Kafka 的应用应直接拥有自己的客户端、配置和生命周期。
 
 ## 最小可运行示例
 

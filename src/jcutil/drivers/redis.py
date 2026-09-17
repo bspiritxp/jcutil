@@ -1,107 +1,149 @@
-# Redis driver
-# please install redis-py
-#
+"""Tagged synchronous and asyncio Redis clients backed by redis-py."""
+
 import asyncio
 import time
 from datetime import timedelta
 from functools import wraps
-from typing import Any, Optional, Protocol, Union, cast
+from typing import Any, Optional, Union
 from uuid import uuid4
 
-from jcramda import first
-from redis.asyncio import Redis
-from redis.asyncio.cluster import RedisCluster
+from redis import Redis as SyncRedis
+from redis import RedisCluster as SyncRedisCluster
+from redis.asyncio import Redis as AsyncRedis
+from redis.asyncio.cluster import RedisCluster as AsyncRedisCluster
 
 from jcutil.core import get_running_loop
 
-__clients = {}
+SyncRedisClient = Union[SyncRedis, SyncRedisCluster]
+AsyncRedisClient = Union[AsyncRedis, AsyncRedisCluster]
+
+__sync_clients: dict[object, SyncRedisClient] = {}
+__async_clients: dict[object, AsyncRedisClient] = {}
 
 
-class RedisClientP(Protocol):
-    async def exists(self, key) -> bool: ...
-
-    async def get(self, key) -> Any: ...
-
-    async def set(self, key, value, ex: Optional[int] = None) -> bool: ...
-
-    async def setnx(self, key, value) -> int: ...
-
-    async def delete(self, key) -> int: ...
-
-    async def expire(self, key, seconds) -> int: ...
+def _client_options(uri: str) -> tuple[str, bool]:
+    """Translate jcutil's legacy ``cluster://`` URI to a redis-py URI."""
+    if uri.startswith('cluster://'):
+        return f'redis://{uri.removeprefix("cluster://")}', True
+    return uri, False
 
 
-async def new_client(uri: str, tag: Optional[str] = None):
+def _client_tag(tag: Optional[Union[str, int]]) -> object:
+    return uuid4() if tag is None else tag
+
+
+def new_sync_client(uri: str, tag: Optional[Union[str, int]] = None) -> SyncRedisClient:
+    """Create and register a synchronous redis-py client under ``tag``."""
+    key = _client_tag(tag)
+    normalized_uri, is_cluster = _client_options(uri)
+    client = (
+        SyncRedisCluster.from_url(normalized_uri)
+        if is_cluster
+        else SyncRedis.from_url(normalized_uri)
+    )
+    __sync_clients[key] = client
+    return client
+
+
+async def new_async_client(uri: str, tag: Optional[Union[str, int]] = None) -> AsyncRedisClient:
+    """Create and register an asyncio redis-py client under ``tag``."""
+    key = _client_tag(tag)
+    normalized_uri, is_cluster = _client_options(uri)
+    client = (
+        AsyncRedisCluster.from_url(normalized_uri)
+        if is_cluster
+        else AsyncRedis.from_url(normalized_uri)
+    )
+    __async_clients[key] = client
+    return client
+
+
+new_client = new_async_client
+
+
+def get_sync_client(tag: Optional[Union[str, int]] = None) -> Optional[SyncRedisClient]:
+    """Return a registered synchronous client, or ``None`` when unavailable."""
     if tag is None:
-        tag = uuid4()
-
-    if uri.startswith('cluster'):
-        __clients[tag] = RedisCluster.from_url(uri)
-    else:
-        __clients[tag] = Redis.from_url(uri)
+        return next(iter(__sync_clients.values()), None)
+    return __sync_clients.get(tag)
 
 
-def get_client(tag: Optional[Union[str, int]] = None) -> Optional[RedisClientP]:
-    """
-    获取redis客户端
-    """
+def get_async_client(tag: Optional[Union[str, int]] = None) -> Optional[AsyncRedisClient]:
+    """Return a registered asyncio client, or ``None`` when unavailable."""
     if tag is None:
-        tag = first(list(__clients.keys()))
-    pool = __clients.get(tag, None)
-    if pool:
-        return cast(RedisClientP, pool)
-    # 如果没有redis客户端,返回None而不是抛出异常
-    return None
+        return next(iter(__async_clients.values()), None)
+    return __async_clients.get(tag)
 
 
-def load(conf: dict[str, Any]) -> None:
-    """
-    一次性读取配置文件，生成redis链接
-    配置文件格式：dict(redis_uri="{redis_uri}")
-    ```
-    {
-      "redis1": "redis://localhost:6379",
-    }
-    """
-    if conf and len(conf) > 0:
-        try:
-            # 检查是否在异步环境中运行
-            loop = asyncio.get_running_loop()
-
-            # 已经在异步环境中，直接创建任务
-            async def _load_clients():
-                tasks = []
-                for key in conf:
-                    tasks.append(new_client(conf[key], key))
-                await asyncio.gather(*tasks)
-
-            # 在已有异步环境中，返回协程给调用者处理
-            return _load_clients()
-        except RuntimeError:
-            # 不在异步环境中，创建新的事件循环
-            loop = get_running_loop()
-            tasks = [loop.create_task(new_client(conf[key], key)) for key in conf]
-            loop.run_until_complete(asyncio.gather(*tasks))
-
-            # print(f'redis: {key} connected')
-
-
+get_client = get_async_client
 connect = conn = get_client
+connect_sync = sync_conn = get_sync_client
+
+
+def load_sync(conf: dict[str, Any]) -> None:
+    """Register synchronous clients for every tagged URI in ``conf``."""
+    for key, uri in conf.items():
+        new_sync_client(uri, key)
+
+
+async def _load_async_clients(conf: dict[str, Any]) -> None:
+    await asyncio.gather(*(new_async_client(uri, key) for key, uri in conf.items()))
+
+
+def load(conf: dict[str, Any]):
+    """Register asynchronous clients, preserving the legacy ``smart_load`` contract."""
+    if not conf:
+        return None
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        loop = get_running_loop()
+        loop.run_until_complete(_load_async_clients(conf))
+        return None
+    return _load_async_clients(conf)
+
+
+def close_sync_client(tag: Optional[Union[str, int]] = None) -> None:
+    """Close and unregister one synchronous client, or every registered client."""
+    if tag is not None:
+        client = __sync_clients.pop(tag, None)
+        if client is not None:
+            client.close()
+        return
+
+    clients = tuple(__sync_clients.values())
+    __sync_clients.clear()
+    for client in clients:
+        client.close()
+
+
+async def aclose_async_client(tag: Optional[Union[str, int]] = None) -> None:
+    """Close and unregister one asyncio client, or every registered client."""
+    if tag is not None:
+        client = __async_clients.pop(tag, None)
+        if client is not None:
+            await client.aclose()
+        return
+
+    clients = tuple(__async_clients.values())
+    __async_clients.clear()
+    await asyncio.gather(*(client.aclose() for client in clients))
 
 
 class Lock:
-    """
-    分布式锁
-    """
+    """Distributed lock implemented with the registered asynchronous client."""
+
     def __init__(self, tag, lock_flg):
-        self._client = connect(tag)
+        client = connect(tag)
+        if client is None:
+            raise RuntimeError(f'Redis client not found: {tag}')
+        self._client = client
         self._flg = lock_flg
         self._owner = False
 
     async def acquire(self, blocking=True, timeout=None):
-        """
-        获取锁
-        """
+        """Acquire the lock, optionally waiting up to ``timeout`` seconds."""
         if self._owner:
             return True
         if not blocking and timeout is not None:
@@ -114,8 +156,8 @@ class Lock:
             curr_time = int(time.time())
             if isinstance(timeout, int) and curr_time - start_time > timeout:
                 return False
-        r = await self._client.setnx(self._flg, int(time.time()))
-        if r:
+        acquired = await self._client.setnx(self._flg, int(time.time()))
+        if acquired:
             self._owner = True
             return True
         return False
@@ -131,17 +173,16 @@ class Lock:
 
 
 class SpinLock(Lock):
-    """
-    自旋锁
-    """
+    """Async context-manager wrapper around :class:`Lock`."""
+
     def __init__(self, tag, flag, blocking=True, timeout=None):
-        super(SpinLock, self).__init__(tag, flag)
+        super().__init__(tag, flag)
         self._blocking = blocking
         self._timeout = timeout
 
     async def __aenter__(self):
-        r = await self.acquire(self._blocking, self._timeout)
-        if not r:
+        acquired = await self.acquire(self._blocking, self._timeout)
+        if not acquired:
             raise RuntimeError(f'Cannot acquire lock: {self._flg}')
         return self
 
@@ -154,13 +195,14 @@ class IntervalLimitError(RuntimeError):
 
 
 def interval_lock(flg, name, timeout=timedelta(seconds=3)):
-    """
-    时间间隔锁
-    """
+    """Reject calls made while the asynchronous Redis interval key exists."""
+
     def limit_ann(fn):
         @wraps(fn)
         async def wrapped(*args, **kwargs):
             client = connect(flg)
+            if client is None:
+                raise RuntimeError(f'Redis client not found: {flg}')
             time_limit = int(timeout.total_seconds())
             if await client.exists(name):
                 raise IntervalLimitError(f'time interval limit in {time_limit}s')

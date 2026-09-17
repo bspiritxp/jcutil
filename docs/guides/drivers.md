@@ -1,6 +1,6 @@
 # 标签化驱动
 
-`jcutil.drivers` 以进程内注册表保存命名客户端。配置键必须匹配驱动模块名：`db`、`mongo`、`redis`、`mq`。`smart_load(conf)` 逐键导入 `jcutil.drivers.<key>` 并调用该模块的 `load()`。
+`jcutil.drivers` 以进程内注册表保存命名客户端。配置键必须匹配现有驱动模块名：`db`、`mongo`、`redis`。`smart_load(conf)` 逐键导入 `jcutil.drivers.<key>` 并调用该模块的 `load()`。
 
 ```python
 from jcutil.drivers import smart_load
@@ -20,7 +20,6 @@ smart_load({
 | `db` | `db.get_sync_engine()` / `db.get_async_engine()` | `KeyError` |
 | `mongo` | `mongo.get_client()` / `mongo.get_collection()` | `KeyError` |
 | `redis` | `redis.connect()` | `None` |
-| `mq` | `mq.send()` | `AssertionError` |
 
 不要写一个假定这些行为相同的通用访问层。
 
@@ -68,32 +67,34 @@ assert 'name_1' in client.index_information('users')
 
 ## Redis
 
-`redis.new_client(uri, tag)` 是协程；`redis.load(conf)` 会在当前运行循环中创建 task。`redis.connect(tag)` 仅返回已注册客户端，不会等待连接就绪。
+`redis` 采用 redis-py 8.1+，同步与 asyncio 注册表相互独立。既有 `new_client()`、`get_client()`、`connect()` / `conn()` 保持为异步 API 的别名；显式 API 为 `new_async_client()` / `get_async_client()` 和 `new_sync_client()` / `get_sync_client()`。
 
 ```python
 from jcutil.drivers import redis
 
-await redis.new_client('redis://localhost:6379/0', 'cache')
-client = redis.connect('cache')
-assert client is not None
+# Existing asyncio API
+client = await redis.new_client('redis://localhost:6379/0', 'cache')
 await client.set('answer', '42')
 assert await client.get('answer') == b'42'
+await redis.aclose_async_client('cache')
+
+# Synchronous API
+client = redis.new_sync_client('redis://localhost:6379/0', 'cache')
+assert client.set('answer', '42') is True
+assert client.get('answer') == b'42'
+redis.close_sync_client('cache')
 ```
 
-以 `cluster://` 开头的 URI 使用 `RedisCluster`；其他 URI 使用 `Redis.from_url`。`Lock`、`SpinLock` 和 `interval_lock()` 建立在异步 Redis 客户端上，参见 API 参考。
+返回的是原生 redis-py 客户端，直接支持 pipeline / transaction、Pub/Sub、Streams、Lua Functions 及其他当前 Redis 命令。异步 pipeline 使用 `async with`，仅 `execute()` 和命令读取需要 `await`；同步与异步客户端都应在应用关闭时调用相应 close API。
 
-## Kafka
+普通 URI 支持 redis-py 的 `redis://`、`rediss://` 与 `unix://`。原有 `cluster://` 前缀仍受支持，会转换为 redis-py 的 Cluster URI；集群 pipeline 支持 key 命令，事务中的所有 key 必须位于同一 hash slot。`redis.load(conf)` 仍加载异步客户端，`redis.load_sync(conf)` 用于同步客户端。`Lock`、`SpinLock` 和 `interval_lock()` 继续使用异步注册表。
 
-`mq` 使用 `kafka-python`。先注册 bootstrap server 字符串，再发送或订阅：
+## 迁移旧 `mq` 配置
 
-```python
-from jcutil.drivers import mq
+`jcutil.drivers.mq` 已移除。仍然使用 Kafka 的应用必须直接拥有 Kafka 客户端、生产者/消费者配置、消息序列化协议、错误处理和生命周期管理；jcutil 不再提供替代 MQ 抽象。
 
-mq.new_client('events', 'broker-1.example:9092', 'broker-2.example:9092')
-future = mq.send('events', 'user-created', {'id': 1})
-future.get(timeout=10)
-```
+不要把 Redis Streams 当作 `mq` 的语义等价替换。Redis Streams 与 Kafka 在持久化模型、消费组语义、保留策略、重放能力和运维边界上都不同；如果业务选择迁移，必须作为独立的消息系统设计与验证。
 
-`send()` 将字符串原样 UTF-8 编码，其他可 JSON 序列化对象用 JSON 编码。`subscribe()` 是协程并包装同步消费者；其回调可为同步或协程函数。Kafka 服务不可达时异常由 kafka-python 或返回的 future 报告。
+删除配置中的旧 `mq` 段。`smart_load(conf)` 对不存在的驱动模块只记录 debug 日志并继续运行，因此遗留 `mq` 配置可能被静默忽略，不能作为 Kafka 客户端已经初始化的信号。
 
 完整函数和类签名见[驱动 API 参考](../reference/drivers.md)。

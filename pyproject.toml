@@ -23,7 +23,7 @@ dependencies = [
     "pymongo>=4.18",
     "python-dotenv",
     "pyyaml",
-    "redis",
+    "redis>=8.1",
     "websockets>=14",
 ]
 

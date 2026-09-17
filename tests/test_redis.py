@@ -6,18 +6,33 @@ import pytest
 import pytest_asyncio
 import yaml
 
-from jcutil.drivers.redis import Lock, SpinLock, get_client, new_client
+from jcutil.drivers.redis import (
+    Lock,
+    SpinLock,
+    aclose_async_client,
+    close_sync_client,
+    get_async_client,
+    get_client,
+    get_sync_client,
+    new_async_client,
+    new_client,
+    new_sync_client,
+)
+
+
+def _redis_uri():
+    redis_uri = 'redis://127.0.0.1:6379'
+    if os.path.exists('tests/config.yaml'):
+        with open('tests/config.yaml', 'r') as file:
+            conf = yaml.safe_load(file)
+            redis_uri = conf.get('redis', {}).get('test', redis_uri)
+    return redis_uri
 
 
 @pytest_asyncio.fixture
 async def setup_redis():
     """Yield an async Redis client or skip when the configured service is unavailable."""
-    redis_uri = "redis://127.0.0.1:6379"
-    if os.path.exists("tests/config.yaml"):
-        with open("tests/config.yaml", "r") as file:
-            conf = yaml.safe_load(file)
-            redis_uri = conf.get("redis", {}).get("test", redis_uri)
-
+    redis_uri = _redis_uri()
     try:
         await new_client(redis_uri, "test")
         client = get_client("test")
@@ -114,3 +129,47 @@ async def test_spin_lock(setup_redis):
 
     # 释放第二个锁
     await lock2.release()
+
+
+def test_sync_client_exposes_pipeline_and_streams():
+    client = new_sync_client(_redis_uri(), 'sync-native')
+    key = 'sync-native-key'
+    stream = 'sync-native-stream'
+
+    try:
+        assert get_sync_client('sync-native') is client
+        with client.pipeline(transaction=True) as pipeline:
+            pipeline.set(key, 'value')
+            pipeline.get(key)
+            assert pipeline.execute() == [True, b'value']
+
+        entry_id = client.xadd(stream, {'event': 'created'})
+        entries = client.xread({stream: '0-0'}, count=1)
+        assert entries[0][1][0][0] == entry_id
+    finally:
+        client.delete(key, stream)
+        close_sync_client('sync-native')
+
+
+@pytest.mark.asyncio
+async def test_async_client_exposes_pipeline_and_streams():
+    client = await new_async_client(_redis_uri(), 'async-native')
+    key = 'async-native-key'
+    stream = 'async-native-stream'
+
+    try:
+        assert get_async_client('async-native') is client
+        assert get_client('async-native') is client
+        async with client.pipeline(transaction=True) as pipeline:
+            pipeline.set(key, 'value')
+            pipeline.get(key)
+            assert await pipeline.execute() == [True, b'value']
+
+        entry_id = await client.xadd(stream, {'event': 'created'})
+        entries = await client.xread({stream: '0-0'}, count=1)
+        assert entries[0][1][0][0] == entry_id
+    finally:
+        await client.delete(key, stream)
+        await aclose_async_client('async-native')
+
+

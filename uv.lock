@@ -460,7 +460,7 @@ requires-dist = [
     { name = "pymongo", specifier = ">=4.18" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "redis" },
+    { name = "redis", specifier = ">=8.1" },
     { name = "websockets", specifier = ">=14" },
 ]
 

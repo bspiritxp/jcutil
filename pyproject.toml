@@ -14,7 +14,7 @@ dependencies = [
     "colorama",
     "httpx>=0.28",
     "jcramda>=1.0.6",
-    "joblib",
+    "joblib>=1.6",
     "pandas",
     "passlib",
     "py-consul>=1.7.1",

@@ -51,7 +51,7 @@ assert to_obj(encoded)['created_at'] == '2026-09-15 00:00:00'
 `SafeJsonEncoder` 将 `datetime` 格式化为 `%Y-%m-%d %H:%M:%S`；时区信息不会保留。映射键会按原样保留。更多限制见[核心、JSON 与并发](guides/core.md)。
 
 !!! warning "先读边界"
-    `obj_loads()`、`redis_cache()` 会反序列化 pickle 数据；只可处理可信来源。`dba.Where` 生成 SQL 字符串而不是参数化查询；绝不能将不可信输入传入。
+    `obj_loads()`、默认 pickle 模式的 `redis_cache()` 和 joblib 缓存/持久化文件读取只可处理可信来源。Redis 缓存可显式选择严格 JSON codec。`dba.Where` 生成 SQL 字符串而不是参数化查询；绝不能将不可信输入传入。
 
 ## 文档约定
 

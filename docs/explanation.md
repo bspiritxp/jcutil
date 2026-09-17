@@ -32,7 +32,7 @@ db.connect(tag) / mongo.get_client(tag) / redis.connect(tag)
 ## 安全边界
 
 - `Where` 的 HTML escaping 不是 SQL escaping，更不是参数化查询。
-- pickle 反序列化 (`obj_loads`、`redis_cache`) 可执行构造对象的代码；数据源必须可信。
+- pickle 反序列化（`obj_loads`、`redis_cache(codec='pickle')`）及 joblib 本地缓存/持久化文件的读取可执行构造对象的代码；数据源和可写目录必须可信。Redis 可显式选择严格 JSON codec，但它不提供缓存写入者认证。
 - 密码需要慢哈希（默认 Argon2），不能使用 `crypto` 的 AES、MD5、SHA 或可逆密文替代。
 - 密钥、Consul token、数据库 URI 与外部服务 endpoint 由部署环境注入；文档示例只使用占位值。Kafka 不再由 jcutil 提供驱动封装，应用必须直接拥有自己的 Kafka 客户端、配置和生命周期。
 

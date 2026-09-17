@@ -676,7 +676,7 @@ requires-dist = [
     { name = "colorama" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "jcramda", specifier = ">=1.0.6" },
-    { name = "joblib" },
+    { name = "joblib", specifier = ">=1.6" },
     { name = "pandas" },
     { name = "passlib" },
     { name = "py-consul", specifier = ">=1.7.1" },

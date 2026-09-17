@@ -17,7 +17,7 @@ dependencies = [
     "joblib",
     "pandas",
     "passlib",
-    "py-consul",
+    "py-consul>=1.7.1",
     "pycryptodomex",
     "pyhcl",
     "pymongo>=4.18",
@@ -27,6 +27,11 @@ dependencies = [
     "websockets>=14",
 ]
 
+
+[project.optional-dependencies]
+consul-async = [
+    "py-consul[asyncio]>=1.7.1",
+]
 
 [build-system]
 requires = ["hatchling"]

@@ -11,9 +11,13 @@ client = ConsulClient(host='127.0.0.1', port=8500)
 settings = fetch_key('config/demo/prod', fmt=ConfigFormat.Yaml, client=client)
 ```
 
-`fetch_key()` 要求该键存在且值非空，否则触发 `AssertionError`。支持 `Text`、`Number`、`Int`、`Float`、`Json`、`Yaml` 和 `Hcl` 格式。全局快捷函数默认使用模块导入时创建的客户端；需要控制 host、ACL token 或 TLS 时，应显式传入 `ConsulClient`。
+`fetch_key()` 要求键记录存在，否则触发 `AssertionError`；默认对 `Value` 进行文本解码，不替缺失值提供默认内容。支持 `Text`、`Number`、`Int`、`Float`、`Json`、`Yaml` 和 `Hcl` 格式；数值格式仍是 `ConfigFormat` 枚举成员，但会在解析时自动展开为对应转换函数。`kv_get()` 保持 py-consul 原生 `(index, data)` 元组。
 
-服务注册、健康检查、会话和锁也有模块级函数。锁的最小生命周期：
+`ConsulClient()` 无参数时保留 py-consul 的模块默认行为（包括 `CONSUL_HTTP_*` 环境变量）。只要传入任一构造参数，显式参数会被转发；例如 `ConsulClient(host=None, port=8501, token='...')` 使用默认 host，但保留显式端口和 token。同步客户端持有 requests session，生产代码应调用 `close()` 或使用 `with ConsulClient(...) as client:` 管理生命周期。原生同步客户端仍可通过 `client.client` 访问，`Consul` 仍是 py-consul 的原生类别名。
+
+只传 `token` 时仍保留环境中的地址；显式指定 host 时保留旧版端口 8500、HTTP、TLS 验证开启的默认值。`KvProperty` 保留原远端路径规则；`bar = KvProperty('foo', cached=True)` 现在正确缓存到 `bar`，类属性访问返回描述符且不打印。
+
+服务注册、健康检查、会话和锁也有模块级函数；这些函数默认使用模块导入时创建的客户端，也可通过关键字参数 `client=` 注入显式客户端。服务查询使用本地 agent 的 `agent.services()` 字典，不查询 catalog。锁的最小生命周期：
 
 ```python
 from jcutil.consul import acquire_lock, create_session, destroy_session, release_lock
@@ -27,7 +31,26 @@ finally:
     destroy_session(session)
 ```
 
-生产代码需要在 TTL 到期前调用 `renew_session()`，并确保异常路径释放锁和销毁 session。
+生产代码需要在 TTL 到期前调用 `renew_session()`，并确保异常路径释放锁和销毁 session。创建会话兼容原有 `'30s'` 秒数字符串及上游整数秒数；保持 `renew_session()` 异常返回 `False` 的契约，不自动续约。
+
+
+## 异步 Consul 客户端
+
+异步支持是可选安装项，避免同步导入路径强依赖 aiohttp：
+
+```bash
+pip install 'jcutil[consul-async]'
+```
+
+```python
+from jcutil.consul import AsyncConsulClient
+
+async with AsyncConsulClient(host='127.0.0.1', port=8500) as client:
+    index, data = await client.kv_get('config/demo/prod')
+    native = client.client  # consul.aio.Consul，用于本封装未重复暴露的 API
+```
+
+`AsyncConsulClient` 使用 py-consul 的 `consul.aio` transport；未安装可选依赖时会在实例化时抛出说明安装方式的 `ImportError`。在运行中的事件循环内创建和关闭，不跨事件循环共享。异步方法与同步封装保持同名语义，但不会把同步方法改成协程，也不会自动续约、后台 watch、重试或改变异常策略。使用 `await client.close()` 或 `async with` 关闭 aiohttp session。
 
 ## 服务端环境和配置加载
 

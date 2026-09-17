@@ -3,7 +3,14 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from jcutil.consul import ConfigFormat, ConsulClient, KvProperty, fetch_key, list_keys
+from jcutil.consul import (
+    AsyncConsulClient,
+    ConfigFormat,
+    ConsulClient,
+    KvProperty,
+    fetch_key,
+    list_keys,
+)
 
 # 从.env文件加载Consul配置
 load_dotenv()
@@ -105,3 +112,139 @@ def test_consul_client(consul_client):
         # 清理测试数据
         consul_client.kv_delete(test_key)
         consul_client.kv_delete("test/consul_client/json")
+
+
+
+class MemoryConsulClient:
+    def __init__(self, values=None):
+        self.values = values or {}
+        self.calls = []
+
+    def kv_get(self, key, **kwargs):
+        self.calls.append(("kv_get", key, kwargs))
+        value = self.values[key]
+        if isinstance(value, str):
+            value = value.encode()
+        return 1, {"Key": key, "Value": value}
+
+
+
+def test_consul_client_no_args_preserves_upstream_env(monkeypatch):
+    monkeypatch.setenv("CONSUL_HTTP_ADDR", "10.1.2.3:18500")
+    monkeypatch.setenv("CONSUL_HTTP_TOKEN", "env-token")
+
+    client = ConsulClient()
+
+    assert client.client.http.host == "10.1.2.3"
+    assert client.client.http.port == 18500
+    assert client.client.token == "env-token"
+    client.close()
+
+
+def test_consul_client_explicit_options_with_host_none(monkeypatch):
+    monkeypatch.setenv("CONSUL_HTTP_ADDR", "10.1.2.3:18500")
+    monkeypatch.setenv("CONSUL_HTTP_TOKEN", "env-token")
+
+    client = ConsulClient(
+        host=None,
+        port=19500,
+        token="explicit-token",
+        scheme="https",
+        dc="dc-test",
+        verify=False,
+    )
+
+    assert client.client.http.host == "127.0.0.1"
+    assert client.client.http.port == 19500
+    assert client.client.http.scheme == "https"
+    assert client.client.http.verify is False
+    assert client.client.dc == "dc-test"
+    assert client.client.token == "explicit-token"
+    client.close()
+
+
+
+def test_fetch_key_numeric_config_formats():
+    client = MemoryConsulClient(
+        {
+            "int": b"42",
+            "float": b"3.5",
+            "number": b"2.75",
+        }
+    )
+
+    assert fetch_key("int", fmt=ConfigFormat.Int, client=client) == 42
+    assert fetch_key("float", fmt=ConfigFormat.Float, client=client) == 3.5
+    from decimal import Decimal
+
+    assert fetch_key("number", fmt=ConfigFormat.Number, client=client) == Decimal("2.75")
+
+
+def test_kv_property_descriptor_and_alias_cache(monkeypatch):
+    values = {"properties/AliasExample/foo": "cached-value"}
+    client = MemoryConsulClient(values)
+    monkeypatch.setattr("jcutil.consul._default_client", client)
+
+    class AliasExample:
+        bar = KvProperty("foo", cached=True)
+
+    assert isinstance(AliasExample.bar, KvProperty)
+    obj = AliasExample()
+
+    assert obj.bar == "cached-value"
+    values["properties/AliasExample/foo"] = "new-value"
+    assert obj.bar == "cached-value"
+    assert AliasExample().bar == "new-value"
+
+
+def test_token_only_preserves_environment_address(monkeypatch):
+    monkeypatch.setenv("CONSUL_HTTP_ADDR", "10.1.2.3:18500")
+    with ConsulClient(token="explicit-token") as client:
+        assert client.client.http.host == "10.1.2.3"
+        assert client.client.http.port == 18500
+        assert client.client.token == "explicit-token"
+
+
+@pytest.mark.asyncio
+async def test_async_consul_kv_roundtrip(consul_client):
+    pytest.importorskip("aiohttp")
+    from uuid import uuid4
+
+    key = f"test/jcutil/async/{uuid4().hex}"
+    async with AsyncConsulClient() as client:
+        try:
+            assert await client.kv_put(key, "async-value") is True
+            _, record = await client.kv_get(key)
+            assert record["Value"] == b"async-value"
+            _, records = await client.kv_list(key)
+            assert [item["Key"] for item in records] == [key]
+            assert await client.kv_delete(key) is True
+            _, record = await client.kv_get(key)
+            assert record is None
+        finally:
+            await client.kv_delete(key)
+
+
+def test_session_default_ttl_preserves_legacy_api(consul_client):
+    from jcutil.consul import create_session
+
+    session_id = create_session("jcutil-ttl-test", client=consul_client, checks=[])
+    try:
+        _, sessions = consul_client.client.session.info(session_id)
+        assert sessions["TTL"] == "30s"
+        assert consul_client.session_renew(session_id) is True
+    finally:
+        consul_client.session_destroy(session_id)
+
+
+@pytest.mark.asyncio
+async def test_async_session_accepts_legacy_ttl(consul_client):
+    pytest.importorskip("aiohttp")
+    async with AsyncConsulClient() as client:
+        session_id = await client.session_create("jcutil-async-ttl-test", ttl="30s", checks=[])
+        try:
+            _, sessions = await client.client.session.info(session_id)
+            assert sessions["TTL"] == "30s"
+            assert await client.session_renew(session_id) is True
+        finally:
+            await client.session_destroy(session_id)

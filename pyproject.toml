@@ -71,7 +71,7 @@ lint.ignore = [
 line-length = 100
 
 # 目标Python版本
-target-version = "py38"
+target-version = "py312"
 
 # 自动修复设置
 [tool.ruff.format]
